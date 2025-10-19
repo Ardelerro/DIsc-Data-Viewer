@@ -21,21 +21,22 @@ const TopServers: FC<{ className?: string }> = ({ className = "" }) => {
 
     for (const [key, stats] of Object.entries(channelStats)) {
       if (!key.startsWith("channel_")) continue;
-
+      
       const channelId = key.replace(/^channel_/, "");
       const total = Object.values(stats.hourly || {}).reduce(
         (sum, val) => sum + (val ?? 0),
         0
       );
-
-      const serverId = serverMapping.channelToServer[channelId] ?? "unknown";
+      const type = data.channelMapping[channelId];
+      if (type !== "GUILD_TEXT" && type !== "PUBLIC_THREAD" && type !== "GUILD_VOICE") continue;
+      const serverId = serverMapping.channelToServer[channelId] ?? "unknown" + ` (${channelId})`;
       serverCounts[serverId] = (serverCounts[serverId] || 0) + total;
     }
 
     const serverStats: ServerStats[] = Object.entries(serverCounts).map(
       ([serverId, totalMessages]) => ({
         serverId,
-        name: serverMapping.serverNames[serverId] ?? "Unknown Server",
+        name: serverMapping.serverNames[serverId] ?? "Unknown Server" + ` (${serverId})`,
         totalMessages,
       })
     );

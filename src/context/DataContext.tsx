@@ -290,9 +290,11 @@ async function processChannels(zip: JSZip) {
 
       if (!channelData.id) continue;
 
-      let type: "DM" | "GROUP_DM" | "GUILD_TEXT" = "GUILD_TEXT";
+      let type: "DM" | "GROUP_DM" | "GUILD_TEXT" | "GUILD_VOICE" | "PUBLIC_THREAD"= "GUILD_TEXT";
       if (channelData.type === "DM") type = "DM";
       else if (channelData.type === "GROUP_DM") type = "GROUP_DM";
+      else if (channelData.type === 13) type = "PUBLIC_THREAD";
+      else if (channelData.type === "GUILD_VOICE") type = "GUILD_VOICE";
 
       channelMapping[channelData.id] = type;
 
@@ -323,13 +325,17 @@ async function processServers(zip: JSZip) {
     try {
       const content = await channelFile.async("text");
       const channelData = JSON.parse(content);
-      if (channelData.type === "GROUP_DM" || channelData.type === "DM")
-        continue;
-
+      if (channelData.type === "GROUP_DM" || channelData.type === "DM") continue;
+      console.log(channelData.type);
       if (channelData.guild && channelData.guild.id && channelData.guild.name) {
-        serverMapping.channelToServer[channelData.id] = channelData.guild.id;
-        serverMapping.serverNames[channelData.guild.id] =
-          channelData.guild.name;
+        const guildId = channelData.guild.id;
+        const guildName = channelData.guild.name.trim();
+
+        if (!guildId || !guildName) continue;
+        if (guildName.toLowerCase() !== "unknown") {
+          serverMapping.channelToServer[channelData.id] = guildId;
+          serverMapping.serverNames[guildId] = guildName;
+        }
       }
     } catch (err) {
       console.warn(`Failed to process server data:`, err);
@@ -462,7 +468,7 @@ async function processMessages(
             let recipientName =
               userMapping[recipientId]?.username ||
               (await resolveUserName(zip, recipientId)) ||
-              "Unknown";
+              "Unknown" + ` (${recipientId})`;
 
             if (recipientName === "Deleted User") {
               deletedUserCountMap[recipientName] =
@@ -488,7 +494,7 @@ async function processMessages(
             const channelData = JSON.parse(await channelFile.async("text"));
             const channelName =
               channelData.name ||
-              (channelType === "GROUP_DM" ? "Group DM" : "Unnamed Channel");
+              (channelType === "GROUP_DM" ? "Group DM" + ` (${channelId})` : "Unnamed Channel" + ` (${channelId})`);
 
             stats.recipientName = channelName;
             stats.topWords = getTopWords(localWordFreq, 5);
