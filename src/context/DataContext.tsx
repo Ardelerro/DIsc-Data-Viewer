@@ -236,7 +236,6 @@ async function extractSelfData(zip: JSZip): Promise<Self> {
 async function extractUserMapping(zip: JSZip) {
   const mapping: Record<string, { username: string; avatar: string }> = {};
 
-  // From user.json
   const userFile = zip.file(/^Account\/user\.json$/i)[0];
   if (userFile) {
     const content = await userFile.async("text");
@@ -254,7 +253,6 @@ async function extractUserMapping(zip: JSZip) {
     }
   }
 
-  // Merge in users.json if available
   const usersFile = zip.file(/^Account\/users\.json$/i)?.[0];
   if (usersFile) {
     const users = JSON.parse(await usersFile.async("text"));
@@ -455,7 +453,6 @@ async function processMessages(
           stats.numGaps > 0 ? stats.totalGapTime / stats.numGaps : 0;
 
         if (channelType === "DM") {
-          // Direct messages — show in "users"
           const channelFile = zip.file(
             new RegExp(`^Messages/c${channelId}/channel\\.json$`, "i")
           )?.[0];
@@ -487,7 +484,6 @@ async function processMessages(
             dmManifest.push(`dm_${channelId}.json`);
           }
         } else {
-          // GROUP_DM and GUILD_TEXT both belong to top channels
           const channelFile = zip.file(
             new RegExp(`^Messages/c${channelId}/channel\\.json$`, "i")
           )?.[0];
