@@ -1,6 +1,5 @@
 import type { FC } from "react";
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
 import ServerSearch from "../components/ServerSearch";
 import { useData } from "../context/DataContext";
 

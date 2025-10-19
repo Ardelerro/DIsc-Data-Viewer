@@ -35,7 +35,6 @@ const ServerSearch: FC = () => {
   const { aggregateData, topChannels } = useMemo(() => {
     if (!data || !selectedServer) return { aggregateData: null, topChannels: [] };
 
-    const serverName = data.serverMapping.serverNames[selectedServer];
     const channelsInServer = Object.entries(data.serverMapping.channelToServer)
       .filter(([_, sid]) => sid === selectedServer)
       .map(([channelId]) => channelId);
