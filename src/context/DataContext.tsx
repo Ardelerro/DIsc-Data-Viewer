@@ -51,16 +51,73 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 const STOP_WORDS = new Set([
-  "i", "you", "me", "he", "she", "it", "we", "they",
-  "a", "an", "the", "and", "or", "but", "if", "to", "of", "in", "on", "for",
-  "is", "am", "are", "was", "were", "be", "been",
-  "this", "that", "these", "those",
-  "my", "your", "his", "her", "their", "our",
-  "at", "by", "with", "about", "as",
- "then",
-  "do", "does", "did", "doing", "so", "than", "too", "very",
-  "can", "will", "just", "dont", "didnt", "im", "ive", "youre", "hes", "shes", "theyre",
-  "i've", "you're", "he's", "she's", "they're"
+  "i",
+  "you",
+  "me",
+  "he",
+  "she",
+  "it",
+  "we",
+  "they",
+  "a",
+  "an",
+  "the",
+  "and",
+  "or",
+  "but",
+  "if",
+  "to",
+  "of",
+  "in",
+  "on",
+  "for",
+  "is",
+  "am",
+  "are",
+  "was",
+  "were",
+  "be",
+  "been",
+  "this",
+  "that",
+  "these",
+  "those",
+  "my",
+  "your",
+  "his",
+  "her",
+  "their",
+  "our",
+  "at",
+  "by",
+  "with",
+  "about",
+  "as",
+  "then",
+  "do",
+  "does",
+  "did",
+  "doing",
+  "so",
+  "than",
+  "too",
+  "very",
+  "can",
+  "will",
+  "just",
+  "dont",
+  "didnt",
+  "im",
+  "ive",
+  "youre",
+  "hes",
+  "shes",
+  "theyre",
+  "i've",
+  "you're",
+  "he's",
+  "she's",
+  "they're",
 ]);
 export const useData = () => {
   const context = useContext(DataContext);
@@ -128,7 +185,13 @@ export const DataProvider: FC<{ children: React.ReactNode }> = ({
     </DataContext.Provider>
   );
 };
-
+async function resolveUserName(
+  zip: JSZip,
+  userId: string
+): Promise<string | null> {
+  const user = await searchUserInUsersJson(zip, userId);
+  return user?.username || null;
+}
 
 async function processZipData(zip: JSZip): Promise<ProcessedData> {
   const self = await extractSelfData(zip);
@@ -171,26 +234,48 @@ async function extractSelfData(zip: JSZip): Promise<Self> {
 }
 
 async function extractUserMapping(zip: JSZip) {
-  const userFile = zip.file(/^Account\/user\.json$/i)[0];
-  if (!userFile) throw new Error("Account/user.json not found");
-
-  const content = await userFile.async("text");
-  const data = JSON.parse(content);
-
   const mapping: Record<string, { username: string; avatar: string }> = {};
 
-  if (data.relationships && Array.isArray(data.relationships)) {
-    for (const rel of data.relationships) {
-      if (rel.user && rel.user.id) {
-        mapping[rel.user.id] = {
-          username: rel.user.username || "Unknown",
-          avatar: rel.user.avatar || "",
-        };
+  // From user.json
+  const userFile = zip.file(/^Account\/user\.json$/i)[0];
+  if (userFile) {
+    const content = await userFile.async("text");
+    const data = JSON.parse(content);
+
+    if (data.relationships) {
+      for (const rel of data.relationships) {
+        const u = rel.user;
+        if (u?.id)
+          mapping[u.id] = {
+            username: u.username || "Unknown",
+            avatar: u.avatar || "",
+          };
       }
     }
   }
 
+  // Merge in users.json if available
+  const usersFile = zip.file(/^Account\/users\.json$/i)?.[0];
+  if (usersFile) {
+    const users = JSON.parse(await usersFile.async("text"));
+    mergeUsers(mapping, users);
+  }
+
   return mapping;
+}
+
+function mergeUsers(
+  mapping: Record<string, { username: string; avatar: string }>,
+  users: any
+) {
+  function recurse(obj: any) {
+    if (!obj || typeof obj !== "object") return;
+    if (obj.id && obj.username) {
+      mapping[obj.id] = { username: obj.username, avatar: obj.avatar || "" };
+    }
+    for (const k in obj) recurse(obj[k]);
+  }
+  recurse(users);
 }
 
 async function processChannels(zip: JSZip) {
@@ -240,7 +325,8 @@ async function processServers(zip: JSZip) {
     try {
       const content = await channelFile.async("text");
       const channelData = JSON.parse(content);
-      if (channelData.type === "GROUP_DM" || channelData.type === "DM") continue;
+      if (channelData.type === "GROUP_DM" || channelData.type === "DM")
+        continue;
 
       if (channelData.guild && channelData.guild.id && channelData.guild.name) {
         serverMapping.channelToServer[channelData.id] = channelData.guild.id;
@@ -309,8 +395,12 @@ async function processMessages(
         let prevMessageTime: number | null = null;
 
         messages.sort((a: any, b: any) => {
-          const tA = a.Timestamp ? new Date(a.Timestamp.replace(" ", "T")).getTime() : 0;
-          const tB = b.Timestamp ? new Date(b.Timestamp.replace(" ", "T")).getTime() : 0;
+          const tA = a.Timestamp
+            ? new Date(a.Timestamp.replace(" ", "T")).getTime()
+            : 0;
+          const tB = b.Timestamp
+            ? new Date(b.Timestamp.replace(" ", "T")).getTime()
+            : 0;
           return tA - tB;
         });
 
@@ -328,7 +418,8 @@ async function processMessages(
           stats.hourly[hour] = (stats.hourly[hour] || 0) + 1;
           stats.monthly[month] = (stats.monthly[month] || 0) + 1;
           aggregateStats.hourly[hour] = (aggregateStats.hourly[hour] || 0) + 1;
-          aggregateStats.monthly[month] = (aggregateStats.monthly[month] || 0) + 1;
+          aggregateStats.monthly[month] =
+            (aggregateStats.monthly[month] || 0) + 1;
 
           stats.messageCount++;
           aggregateStats.messageCount++;
@@ -348,8 +439,7 @@ async function processMessages(
           messageDates.add(timestamp.toISOString().split("T")[0]);
 
           if (msg.Contents) {
-            const words = msg.Contents
-              .toLowerCase()
+            const words = msg.Contents.toLowerCase()
               .replace(/[^a-z0-9\s]/g, "")
               .split(/\s+/)
               .filter((word: string) => word && !STOP_WORDS.has(word));
@@ -364,23 +454,21 @@ async function processMessages(
         stats.averageGapBetweenMessages =
           stats.numGaps > 0 ? stats.totalGapTime / stats.numGaps : 0;
 
-        if (channelType === "DM" ||channelType === "GROUP_DM") {
+        if (channelType === "DM") {
+          // Direct messages — show in "users"
           const channelFile = zip.file(
             new RegExp(`^Messages/c${channelId}/channel\\.json$`, "i")
           )?.[0];
           if (channelFile) {
             const channelData = JSON.parse(await channelFile.async("text"));
             const recipientId =
-              channelData.recipients?.find((r: string) => r !== yourId) || "unknown";
+              channelData.recipients?.find((r: string) => r !== yourId) ||
+              "unknown";
 
-            let recipientName = userMapping[recipientId]?.username;
-            if (!recipientName || recipientName === "Unknown") {
-              if (!usersJsonCache[recipientId]) {
-                const fallback = await searchUserInUsersJson(zip, recipientId);
-                if (fallback) usersJsonCache[recipientId] = fallback;
-              }
-              recipientName = usersJsonCache[recipientId]?.username || "Unknown";
-            }
+            let recipientName =
+              userMapping[recipientId]?.username ||
+              (await resolveUserName(zip, recipientId)) ||
+              "Unknown";
 
             if (recipientName === "Deleted User") {
               deletedUserCountMap[recipientName] =
@@ -399,10 +487,31 @@ async function processMessages(
             dmManifest.push(`dm_${channelId}.json`);
           }
         } else {
-          channelStats[`channel_${channelId}`] = stats;
+          // GROUP_DM and GUILD_TEXT both belong to top channels
+          const channelFile = zip.file(
+            new RegExp(`^Messages/c${channelId}/channel\\.json$`, "i")
+          )?.[0];
+          if (channelFile) {
+            const channelData = JSON.parse(await channelFile.async("text"));
+            const channelName =
+              channelData.name ||
+              (channelType === "GROUP_DM" ? "Group DM" : "Unnamed Channel");
+
+            stats.recipientName = channelName;
+            stats.topWords = getTopWords(localWordFreq, 5);
+            const streak = calculateStreak(messageDates);
+            stats.longestStreak = streak.length;
+            stats.streakStart = streak.start;
+            stats.streakEnd = streak.end;
+
+            channelStats[`channel_${channelId}`] = stats;
+          }
         }
       } catch (err) {
-        console.warn(`Failed processing messages for file: ${messagesFile.name}`, err);
+        console.warn(
+          `Failed processing messages for file: ${messagesFile.name}`,
+          err
+        );
       }
     })
   );
@@ -431,7 +540,9 @@ async function searchUserInUsersJson(
     return null;
   }
 
-  function recursiveSearch(obj: any): { username: string; avatar: string } | null {
+  function recursiveSearch(
+    obj: any
+  ): { username: string; avatar: string } | null {
     if (!obj || typeof obj !== "object") return null;
     if (obj.id === userId && obj.username) {
       return { username: obj.username, avatar: obj.avatar || "" };

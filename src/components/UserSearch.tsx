@@ -20,6 +20,7 @@ const UserSearch: FC = () => {
     if (!data) return [];
 
     return Object.entries(data.channelStats)
+      .filter(([key]) => key.startsWith("dm_"))
       .filter(([_, entry]) => entry.recipientName)
       .map(([key, entry]) => ({
         key,
