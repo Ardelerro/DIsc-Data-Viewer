@@ -361,9 +361,6 @@ async function processMessages(
   const dmManifest: string[] = [];
   const globalWordFreq: Record<string, number> = {};
   const deletedUserCountMap: Record<string, number> = {};
-  const usersJsonCache: Record<string, { username: string; avatar: string }> =
-    {};
-
   const messageFiles = zip.file(/^Messages\/c\d+\/messages\.json$/i) || [];
 
   await Promise.all(
