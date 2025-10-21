@@ -56,8 +56,7 @@ const SelfDisplay: FC = () => {
 
   const avgPerDay = (totalMessages / daysActive).toFixed(1);
   const avgPerPerson = (
-    totalMessages /
-    Object.keys(data.userMapping || {}).length
+    totalMessages / Object.keys(data.userMapping || {}).length
   ).toFixed(1);
 
   return (
@@ -89,6 +88,44 @@ const SelfDisplay: FC = () => {
             {avgPerPerson}
           </p>
         </div>
+        {data.activityStats && (
+          <div className="mt-4 border-t pt-3 space-y-1 text-sm text-slate-700 dark:text-slate-300">
+            <p>
+              📎{" "}
+              <span className="font-medium">Number of attachments sent:</span>{" "}
+              {data.activityStats.attachmentsSent}
+            </p>
+            <p>
+              😀 <span className="font-medium">Number of reactions added:</span>{" "}
+              {data.activityStats.addReaction}
+            </p>
+            <p>
+              🗣️{" "}
+              <span className="font-medium">
+                Number of voice channels joined:
+              </span>{" "}
+              {data.activityStats.joinVoice}
+            </p>
+            <p>
+              📞 <span className="font-medium">Number of DM calls:</span>{" "}
+              {data.activityStats.joinCall + data.activityStats.startCall}
+            </p>
+            <p>
+              🎧{" "}
+              <span className="font-medium">
+                Number of server calls joined:
+              </span>{" "}
+              {data.activityStats.joinVoice}
+            </p>
+            <p>
+              📱{" "}
+              <span className="font-medium">
+                Number of times Discord opened:
+              </span>{" "}
+              {data.activityStats.appOpened}
+            </p>
+          </div>
+        )}
       </motion.div>
     </div>
   );
