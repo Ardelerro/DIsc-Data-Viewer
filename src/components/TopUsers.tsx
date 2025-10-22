@@ -90,6 +90,7 @@ const TopUsers: FC<{ className?: string }> = ({ className = "" }) => {
           No DM stats found.
         </div>
       ) : (
+        <div className="overflow-x-auto">
         <table className="min-w-full table-auto text-base text-slate-700 dark:text-slate-200">
           <thead>
             <tr className="bg-slate-100 dark:bg-slate-700/40 text-left text-lg">
@@ -123,6 +124,7 @@ const TopUsers: FC<{ className?: string }> = ({ className = "" }) => {
             ))}
           </tbody>
         </table>
+      </div>
       )}
     </motion.div>
   );
