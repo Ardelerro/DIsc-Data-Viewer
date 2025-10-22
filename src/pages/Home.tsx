@@ -1,10 +1,5 @@
 import type {
-  FC,
-  JSXElementConstructor,
-  Key,
-  ReactElement,
-  ReactNode,
-  ReactPortal,
+  FC
 } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
