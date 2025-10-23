@@ -165,10 +165,6 @@ export const DataProvider: FC<{ children: React.ReactNode }> = ({
     setError(null);
 
     try {
-      
-
-      
-      
       const zip = await JSZip.loadAsync(file);
 
       const hasAccount = zip.file(/^Account\//i).length > 0;
@@ -177,34 +173,32 @@ export const DataProvider: FC<{ children: React.ReactNode }> = ({
         throw new Error("Invalid package structure");
       }
 
-      
       const processedData = await processZipData(zip, (progress) => {
-        const adjusted = map(smoothProgress(progress), 0, 100, 0, 4); 
+        const adjusted = map(smoothProgress(progress), 0, 100, 0, 4);
         onProgress?.(adjusted, "Processing channels and messages...");
       });
 
-      
       const activityStats = await processActivities(file, (progress) => {
-        const adjusted = map(progress, 0, 100, 4, 99); 
+        const adjusted = map(progress, 0, 100, 4, 99);
         onProgress?.(adjusted, "Processing activity data...");
       });
 
       processedData.activityStats = activityStats;
 
-      
       onProgress?.(99, "Saving data...");
       setData(processedData);
       localStorage.setItem(
         "discord-processed-data",
         JSON.stringify(processedData)
       );
-      
+
       onProgress?.(100, "Complete!");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
       throw err;
     } finally {
       setIsLoading(false);
+      console.log("Total batch time:", rTime);
     }
   };
 
@@ -223,7 +217,6 @@ export const DataProvider: FC<{ children: React.ReactNode }> = ({
 };
 
 function smoothProgress(p: number): number {
-  
   return Math.pow(p / 100, 0.6) * 100;
 }
 function map(
@@ -235,18 +228,23 @@ function map(
 ) {
   return ((value - inMin) * (outMax - outMin)) / (inMax - inMin) + outMin;
 }
+
+let rTime = 0;
+
+const times = [0,0,0,0,0,0];
 async function processActivities(
   zipFile: File | Blob,
   onProgress?: (progress: number) => void
 ): Promise<ActivityStats> {
+  let ziptimeStart = performance.now();
   const zipReader = new ZipReader(new BlobReader(zipFile));
-  
+
   const entries = await zipReader.getEntries();
   const activityEntry =
     entries.find((e) =>
       /Activity\/Analytics\/[^/]+\.json$/i.test(e.filename)
     ) || entries.find((e) => /Account\/activity\.json$/i.test(e.filename));
-  
+
   if (!activityEntry) {
     console.warn("No activity or analytics file found");
     await zipReader.close();
@@ -259,6 +257,8 @@ async function processActivities(
       appOpened: 0,
     };
   }
+  console.log("Time to open zip and find activity file:", performance.now() - ziptimeStart);
+  ziptimeStart = performance.now();
   const counters = {
     addReaction: 0,
     attachmentsSent: 0,
@@ -272,100 +272,62 @@ async function processActivities(
     return counters;
   }
 
-  
-
   let leftover = "";
   const decoder = new TextDecoder();
 
-  
   const patterns = {
-    addReaction: "add_reaction",
-    attachmentsSent: "message_sent_with_attachments",
-    joinVoice: "join_voice_channel",
-    startCall: "start_call",
-    joinCall: "join_call",
-    appOpened: "app_opened",
-  };
+  addReaction: /add_reaction/g,
+  attachmentsSent: /message_sent_with_attachments/g,
+  joinVoice: /join_voice_channel/g,
+  startCall: /start_call/g,
+  joinCall: /join_call/g,
+  appOpened: /app_opened/g,
+};
 
-  
-  let processedBytes = 0;
-  const totalBytes = activityEntry.uncompressedSize || 1;
-  const writableStream = new WritableStream({
-    write(chunk) {
-      const text = leftover + decoder.decode(chunk, { stream: true });
-      const newlineIdx = text.lastIndexOf("\n");
+const totalBytes = activityEntry.uncompressedSize;
+let processedBytes = 0;
+const writableStream = new WritableStream({
+  write(chunk) {
+    const text = leftover + decoder.decode(chunk, { stream: true });
 
-      if (newlineIdx === -1) {
-        leftover = text;
-        return;
+
+    const lastClose = text.lastIndexOf("}");
+    const processText = lastClose !== -1 ? text.slice(0, lastClose + 1) : "";
+    leftover = lastClose !== -1 ? text.slice(lastClose + 1) : text;
+
+    for (const [key, regex] of Object.entries(patterns)) {
+      regex.lastIndex = 0;
+      let match;
+      while ((match = regex.exec(processText)) !== null) {
+        counters[key as keyof typeof counters]++;
       }
-
-      const toProcess = text.slice(0, newlineIdx);
-      leftover = text.slice(newlineIdx + 1);
-
-      
-      processedBytes += chunk.byteLength;
-      if (processedBytes % 10000 == 0 || processedBytes === totalBytes) {
-        const progress = Math.min(100, (processedBytes / totalBytes) * 100);
-        onProgress?.(progress);
-      }
-
-
-      
-      let pos = 0;
-      while (pos < toProcess.length) {
-        const nextNewline = toProcess.indexOf("\n", pos);
-        const lineEnd = nextNewline === -1 ? toProcess.length : nextNewline;
-        const line = toProcess.slice(pos, lineEnd);
-
-        if (line.length > 10) {
-          if (line.indexOf(patterns.addReaction) !== -1) counters.addReaction++;
-          else if (line.indexOf(patterns.attachmentsSent) !== -1)
-            counters.attachmentsSent++;
-          else if (line.indexOf(patterns.joinVoice) !== -1)
-            counters.joinVoice++;
-          else if (line.indexOf(patterns.startCall) !== -1)
-            counters.startCall++;
-          else if (line.indexOf(patterns.joinCall) !== -1) counters.joinCall++;
-          else if (line.indexOf(patterns.appOpened) !== -1)
-            counters.appOpened++;
+    }
+    processedBytes += chunk.byteLength;
+    if(processedBytes % 10000 === 0 || processedBytes === totalBytes) {
+      onProgress?.(Math.min(100, Math.floor((processedBytes / totalBytes) * 100)));
+    }
+  },
+  close() {
+    if (leftover.length > 0) {
+      for (const [key, regex] of Object.entries(patterns)) {
+        regex.lastIndex = 0;
+        let match;
+        while ((match = regex.exec(leftover)) !== null) {
+          counters[key as keyof typeof counters]++;
         }
-
-        pos = lineEnd + 1;
       }
+    }
+  },
+});
 
-      
-      
-      
-    },
-
-    close() {
-      
-      if (leftover.length > 10) {
-        if (leftover.indexOf(patterns.addReaction) !== -1)
-          counters.addReaction++;
-        else if (leftover.indexOf(patterns.attachmentsSent) !== -1)
-          counters.attachmentsSent++;
-        else if (leftover.indexOf(patterns.joinVoice) !== -1)
-          counters.joinVoice++;
-        else if (leftover.indexOf(patterns.startCall) !== -1)
-          counters.startCall++;
-        else if (leftover.indexOf(patterns.joinCall) !== -1)
-          counters.joinCall++;
-        else if (leftover.indexOf(patterns.appOpened) !== -1)
-          counters.appOpened++;
-      }
-      
-    },
-    
-  });
-
-  
+  ziptimeStart = performance.now();
   await activityEntry.getData(writableStream);
-
+  console.log("Time to process activity stream:", performance.now() - ziptimeStart);
   await zipReader.close();
+  console.log("Activity processing times:", times);
   return counters;
 }
+
 async function resolveUserName(
   zip: JSZip,
   userId: string
@@ -383,31 +345,28 @@ async function processZipData(
     stageProgress = Math.min(100, stageProgress + inc);
     onProgress?.(stageProgress);
   };
-  
+
   const self = await extractSelfData(zip);
-  
+
   const userMapping = await extractUserMapping(zip);
-  
+
   update(1);
   const { channelMapping, channelNaming, channelManifest } =
     await processChannels(zip);
-  
+
   update(1);
   const serverMapping = await processServers(zip);
-  
+
   const { aggregateStats, channelStats, dmManifest } = await processMessages(
     zip,
     channelMapping,
     userMapping,
     self.id,
     (msgProgress: number) => {
-      update(map(msgProgress, 0, 100, 8, 100)); 
-      
+      update(map(msgProgress, 0, 100, 8, 100));
     }
   );
 
-  
-  
   return {
     self,
     userMapping,
@@ -450,7 +409,7 @@ async function extractUserMapping(zip: JSZip) {
   if (userFile) {
     const content = await userFile.async("text");
     const data = JSON.parse(content);
-    
+
     if (data.relationships) {
       for (const rel of data.relationships) {
         const u = rel.user;
@@ -542,7 +501,7 @@ async function processServers(zip: JSZip) {
       const channelData = JSON.parse(content);
       if (channelData.type === "GROUP_DM" || channelData.type === "DM")
         continue;
-      
+
       if (channelData.guild && channelData.guild.id && channelData.guild.name) {
         const guildId = channelData.guild.id;
         const guildName = channelData.guild.name.trim();
