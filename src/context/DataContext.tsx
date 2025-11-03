@@ -5,6 +5,7 @@ import React, {
   useEffect,
   type FC,
 } from "react";
+import Sentiment from "sentiment";
 import JSZip from "jszip";
 import { ZipReader, BlobReader } from "@zip.js/zip.js";
 
@@ -13,7 +14,12 @@ interface Self {
   username: string;
   avatar_hash?: string;
 }
-
+interface SentimentStats {
+  average: number;
+  positive: number;
+  negative: number;
+  neutral: number;
+}
 interface ChannelStats {
   hourly: Record<string, number>;
   monthly: Record<string, number>;
@@ -23,6 +29,7 @@ interface ChannelStats {
   longestStreak?: number;
   streakStart?: string | null;
   streakEnd?: string | null;
+  sentiment?: SentimentStats;
 }
 
 interface ServerMapping {
@@ -144,7 +151,6 @@ export const DataProvider: FC<{ children: React.ReactNode }> = ({
   const [data, setData] = useState<ProcessedData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   useEffect(() => {
     const stored = localStorage.getItem("discord-processed-data");
     if (stored) {
@@ -198,7 +204,6 @@ export const DataProvider: FC<{ children: React.ReactNode }> = ({
       throw err;
     } finally {
       setIsLoading(false);
-      console.log("Total batch time:", rTime);
     }
   };
 
@@ -228,15 +233,10 @@ function map(
 ) {
   return ((value - inMin) * (outMax - outMin)) / (inMax - inMin) + outMin;
 }
-
-let rTime = 0;
-
-const times = [0,0,0,0,0,0];
 async function processActivities(
   zipFile: File | Blob,
   onProgress?: (progress: number) => void
 ): Promise<ActivityStats> {
-  let ziptimeStart = performance.now();
   const zipReader = new ZipReader(new BlobReader(zipFile));
 
   const entries = await zipReader.getEntries();
@@ -257,8 +257,6 @@ async function processActivities(
       appOpened: 0,
     };
   }
-  console.log("Time to open zip and find activity file:", performance.now() - ziptimeStart);
-  ziptimeStart = performance.now();
   const counters = {
     addReaction: 0,
     attachmentsSent: 0,
@@ -276,58 +274,81 @@ async function processActivities(
   const decoder = new TextDecoder();
 
   const patterns = {
-  addReaction: /add_reaction/g,
-  attachmentsSent: /message_sent_with_attachments/g,
-  joinVoice: /join_voice_channel/g,
-  startCall: /start_call/g,
-  joinCall: /join_call/g,
-  appOpened: /app_opened/g,
-};
+    addReaction: "add_reaction",
+    attachmentsSent: "message_sent_with_attachments",
+    joinVoice: "join_voice_channel",
+    startCall: "start_call",
+    joinCall: "join_call",
+    appOpened: "app_opened",
+  };
 
-const totalBytes = activityEntry.uncompressedSize;
-let processedBytes = 0;
-const writableStream = new WritableStream({
-  write(chunk) {
-    const text = leftover + decoder.decode(chunk, { stream: true });
+  let processedBytes = 0;
+  const totalBytes = activityEntry.uncompressedSize || 1;
+  const writableStream = new WritableStream({
+    write(chunk) {
+      const text = leftover + decoder.decode(chunk, { stream: true });
+      const newlineIdx = text.lastIndexOf("\n");
 
-
-    const lastClose = text.lastIndexOf("}");
-    const processText = lastClose !== -1 ? text.slice(0, lastClose + 1) : "";
-    leftover = lastClose !== -1 ? text.slice(lastClose + 1) : text;
-
-    for (const [key, regex] of Object.entries(patterns)) {
-      regex.lastIndex = 0;
-      let match;
-      while ((match = regex.exec(processText)) !== null) {
-        counters[key as keyof typeof counters]++;
+      if (newlineIdx === -1) {
+        leftover = text;
+        return;
       }
-    }
-    processedBytes += chunk.byteLength;
-    if(processedBytes % 10000 === 0 || processedBytes === totalBytes) {
-      onProgress?.(Math.min(100, Math.floor((processedBytes / totalBytes) * 100)));
-    }
-  },
-  close() {
-    if (leftover.length > 0) {
-      for (const [key, regex] of Object.entries(patterns)) {
-        regex.lastIndex = 0;
-        let match;
-        while ((match = regex.exec(leftover)) !== null) {
-          counters[key as keyof typeof counters]++;
+
+      const toProcess = text.slice(0, newlineIdx);
+      leftover = text.slice(newlineIdx + 1);
+
+      processedBytes += chunk.byteLength;
+      if (processedBytes % 10000 == 0 || processedBytes === totalBytes) {
+        const progress = Math.min(100, (processedBytes / totalBytes) * 100);
+        onProgress?.(progress);
+      }
+
+      let pos = 0;
+      while (pos < toProcess.length) {
+        const nextNewline = toProcess.indexOf("\n", pos);
+        const lineEnd = nextNewline === -1 ? toProcess.length : nextNewline;
+        const line = toProcess.slice(pos, lineEnd);
+
+        if (line.length > 10) {
+          if (line.indexOf(patterns.addReaction) !== -1) counters.addReaction++;
+          else if (line.indexOf(patterns.attachmentsSent) !== -1)
+            counters.attachmentsSent++;
+          else if (line.indexOf(patterns.joinVoice) !== -1)
+            counters.joinVoice++;
+          else if (line.indexOf(patterns.startCall) !== -1)
+            counters.startCall++;
+          else if (line.indexOf(patterns.joinCall) !== -1) counters.joinCall++;
+          else if (line.indexOf(patterns.appOpened) !== -1)
+            counters.appOpened++;
         }
-      }
-    }
-  },
-});
 
-  ziptimeStart = performance.now();
+        pos = lineEnd + 1;
+      }
+    },
+
+    close() {
+      if (leftover.length > 10) {
+        if (leftover.indexOf(patterns.addReaction) !== -1)
+          counters.addReaction++;
+        else if (leftover.indexOf(patterns.attachmentsSent) !== -1)
+          counters.attachmentsSent++;
+        else if (leftover.indexOf(patterns.joinVoice) !== -1)
+          counters.joinVoice++;
+        else if (leftover.indexOf(patterns.startCall) !== -1)
+          counters.startCall++;
+        else if (leftover.indexOf(patterns.joinCall) !== -1)
+          counters.joinCall++;
+        else if (leftover.indexOf(patterns.appOpened) !== -1)
+          counters.appOpened++;
+      }
+    },
+  });
+
   await activityEntry.getData(writableStream);
-  console.log("Time to process activity stream:", performance.now() - ziptimeStart);
+
   await zipReader.close();
-  console.log("Activity processing times:", times);
   return counters;
 }
-
 async function resolveUserName(
   zip: JSZip,
   userId: string
@@ -526,6 +547,7 @@ async function processMessages(
   yourId: string,
   p0: (msgProgress: number) => void
 ) {
+  const sentiment = new Sentiment();
   const MESSAGE_GAP_THRESHOLD = 30;
   const MESSAGE_GAP_IGNORED = 259200;
 
@@ -619,6 +641,21 @@ async function processMessages(
           messageDates.add(timestamp.toISOString().split("T")[0]);
 
           if (msg.Contents) {
+            const result = sentiment.analyze(msg.Contents);
+            if (!stats.sentiment) {
+              stats.sentiment = {
+                average: 0,
+                positive: 0,
+                negative: 0,
+                neutral: 0,
+              };
+            }
+
+            if (result.score > 0) stats.sentiment.positive++;
+            else if (result.score < 0) stats.sentiment.negative++;
+            else stats.sentiment.neutral++;
+
+            stats.sentiment.average += result.score;
             const words = msg.Contents.toLowerCase()
               .replace(/[^a-z0-9\s]/g, "")
               .split(/\s+/)
@@ -630,7 +667,9 @@ async function processMessages(
             }
           }
         }
-
+        if (stats.messageCount > 0 && stats.sentiment) {
+          stats.sentiment.average /= stats.messageCount;
+        }
         stats.averageGapBetweenMessages =
           stats.numGaps > 0 ? stats.totalGapTime / stats.numGaps : 0;
 

@@ -17,10 +17,11 @@ const UploadPage: FC = () => {
 
   const progressHistory = useRef<{ progress: number; time: number }[]>([]);
   const smoothedMsPerPercent = useRef<number | null>(null);
-  
+  //const [useMLSentiment, setUseMLSentiment] = useState(false);
+
   const onProgress = (newProgress: number) => {
     const now = performance.now();
-    
+
     if (newProgress < 0) newProgress = 0;
     if (newProgress > 100) newProgress = 100;
 
@@ -45,7 +46,7 @@ const UploadPage: FC = () => {
       if (smoothedMsPerPercent.current == null) {
         smoothedMsPerPercent.current = avgMsPerPercent;
       } else {
-        const alpha = 0.15;
+        const alpha = 0.1;
         smoothedMsPerPercent.current =
           alpha * avgMsPerPercent + (1 - alpha) * smoothedMsPerPercent.current;
       }
@@ -111,7 +112,23 @@ const UploadPage: FC = () => {
             All processing happens locally in your browser. Your data never
             leaves your device.
           </p>
-
+          {/*}
+          <div className="mb-6 flex items-center space-x-3">
+            <input
+              id="ml-toggle"
+              type="checkbox"
+              checked={useMLSentiment}
+              onChange={(e) => setUseMLSentiment(e.target.checked)}
+              className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            />
+            <label
+              htmlFor="ml-toggle"
+              className="text-sm font-medium text-slate-700 dark:text-slate-300"
+            >
+              Use ML-based sentiment analysis (slower)
+            </label>
+          </div>
+          */}
           <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
             <p className="text-sm text-blue-800 dark:text-blue-300 font-medium mb-2">
               📁 Your ZIP file should contain:
