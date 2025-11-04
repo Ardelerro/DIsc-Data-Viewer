@@ -2,7 +2,7 @@ import type { FC } from "react";
 import { useState, useMemo } from "react";
 import HourlyChart from "../components/HourlyChart";
 import MonthlyChart from "../components/MonthlyChart";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useData } from "../context/DataContext";
 
 interface ChannelStats {
@@ -20,17 +20,16 @@ const ServerSearch: FC = () => {
   const { data } = useData();
   const [selectedServer, setSelectedServer] = useState<string | null>(null);
 
-    const serverOptions = useMemo(() => {
+  const serverOptions = useMemo(() => {
     if (!data) return [];
-
     return Object.entries(data.serverMapping.serverNames)
-        .sort(([, nameA], [, nameB]) => nameA.localeCompare(nameB))
-        .map(([id, name]) => (
+      .sort(([, nameA], [, nameB]) => nameA.localeCompare(nameB))
+      .map(([id, name]) => (
         <option key={id} value={id}>
-            {name}
+          {name}
         </option>
-        ));
-    }, [data]);
+      ));
+  }, [data]);
 
   const { aggregateData, topChannels } = useMemo(() => {
     if (!data || !selectedServer) return { aggregateData: null, topChannels: [] };
@@ -79,75 +78,126 @@ const ServerSearch: FC = () => {
       </div>
     );
 
+  const selectedName =
+    selectedServer && data.serverMapping.serverNames[selectedServer]
+      ? data.serverMapping.serverNames[selectedServer]
+      : null;
+
   return (
     <div className="max-w-4xl mx-auto px-4">
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-6">
-        Search Server Statistics
+      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-8">
+        Server Statistics
       </h1>
 
-      <div className="mb-6">
-        <label className="block mb-2 text-slate-700 dark:text-slate-300 font-medium">
-          Select a server:
+      <motion.div
+        className="mb-10"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
+        <label className="block mb-3 text-sm text-slate-700 dark:text-slate-300 font-medium">
+          Select a server
         </label>
-        <select
+        <motion.select
           value={selectedServer ?? ""}
           onChange={(e) => setSelectedServer(e.target.value || null)}
-          className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+          className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm hover:shadow-md transition-all duration-200 focus:ring-2 focus:ring-indigo-500"
+          whileFocus={{ scale: 1.02 }}
         >
           <option value="" disabled>
             -- Choose a server --
           </option>
           {serverOptions}
-        </select>
-      </div>
+        </motion.select>
 
-      {aggregateData && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3 }}
-          className="space-y-6"
-        >
-          <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">
-            Aggregate Stats for{" "}
-            <span className="text-indigo-600 dark:text-indigo-400">
-              {data.serverMapping.serverNames[selectedServer!]}
-            </span>
-          </h2>
+        <AnimatePresence mode="wait">
+          {selectedName && (
+            <motion.p
+              key={selectedName}
+              initial={{ opacity: 0, y: -5 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -5 }}
+              transition={{ duration: 0.3 }}
+              className="mt-2 text-sm text-slate-500 dark:text-slate-400"
+            >
+              Viewing stats for <span className="font-medium">{selectedName}</span>
+            </motion.p>
+          )}
+        </AnimatePresence>
+      </motion.div>
 
-          <HourlyChart data={aggregateData.hourly} />
-          <MonthlyChart data={aggregateData.monthly} />
+      <AnimatePresence>
+        {aggregateData && (
+          <motion.div
+            key="charts"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4 }}
+            className="space-y-8"
+          >
+            <div className="text-center">
+              <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">
+                Aggregate Activity for{" "}
+                <span className="text-indigo-600 dark:text-indigo-400 font-bold">
+                  {selectedName}
+                </span>
+              </h2>
+            </div>
 
-          <div className="mt-6">
-            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-2">
-              Top Channels
-            </h3>
-            <table className="min-w-full table-auto text-base text-slate-700 dark:text-slate-200">
-              <thead>
-                <tr className="bg-slate-100 dark:bg-slate-700/40 text-left text-lg">
-                  <th className="px-4 py-2 font-medium">Rank</th>
-                  <th className="px-4 py-2 font-medium">Channel</th>
-                  <th className="px-4 py-2 font-medium">Messages</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topChannels.map((c, i) => (
-                  <tr
-                    key={c.name}
-                    className="even:bg-slate-50 dark:even:bg-slate-700/30 hover:bg-indigo-50 dark:hover:bg-slate-700/50 transition-colors"
-                  >
-                    <td className="px-6 py-3 font-semibold text-lg">#{i + 1}</td>
-                    <td className="px-6 py-3">{c.name}</td>
-                    <td className="px-6 py-3 text-indigo-600 dark:text-indigo-400 text-lg">
-                      {c.totalMessages.toLocaleString()}
-                    </td>
+            <motion.div
+              className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl shadow-sm p-4 hover:shadow-md transition-all"
+              whileHover={{ scale: 1.01 }}
+            >
+              <HourlyChart data={aggregateData.hourly} />
+            </motion.div>
+
+            <motion.div
+              className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl shadow-sm p-4 hover:shadow-md transition-all"
+              whileHover={{ scale: 1.01 }}
+            >
+              <MonthlyChart data={aggregateData.monthly} />
+            </motion.div>
+
+            <motion.div
+              className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl shadow-sm p-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.1, duration: 0.4 }}
+            >
+              <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">
+                Top Channels
+              </h3>
+              <table className="min-w-full table-auto text-base text-slate-700 dark:text-slate-200">
+                <thead>
+                  <tr className="bg-slate-100 dark:bg-slate-700/40 text-left text-lg">
+                    <th className="px-4 py-2 font-medium">Rank</th>
+                    <th className="px-4 py-2 font-medium">Channel</th>
+                    <th className="px-4 py-2 font-medium">Messages</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </motion.div>
-      )}
+                </thead>
+                <tbody>
+                  {topChannels.map((c, i) => (
+                    <motion.tr
+                      key={c.name}
+                      className="even:bg-slate-50 dark:even:bg-slate-700/30 hover:bg-indigo-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer"
+                      whileHover={{ scale: 1.01 }}
+                    >
+                      <td className="px-6 py-3 font-semibold text-lg text-slate-600 dark:text-slate-300">
+                        #{i + 1}
+                      </td>
+                      <td className="px-6 py-3">{c.name}</td>
+                      <td className="px-6 py-3 text-indigo-600 dark:text-indigo-400 text-lg font-medium">
+                        {c.totalMessages.toLocaleString()}
+                      </td>
+                    </motion.tr>
+                  ))}
+                </tbody>
+              </table>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

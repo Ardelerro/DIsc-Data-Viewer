@@ -1,11 +1,9 @@
 import type { FC } from "react";
 import { useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useData } from "../context/DataContext";
 
 const UploadPage: FC = () => {
-  const navigate = useNavigate();
   const { uploadData, isLoading } = useData();
 
   const [error, setError] = useState<string | null>(null);
@@ -17,11 +15,9 @@ const UploadPage: FC = () => {
 
   const progressHistory = useRef<{ progress: number; time: number }[]>([]);
   const smoothedMsPerPercent = useRef<number | null>(null);
-  //const [useMLSentiment, setUseMLSentiment] = useState(false);
 
   const onProgress = (newProgress: number) => {
     const now = performance.now();
-
     if (newProgress < 0) newProgress = 0;
     if (newProgress > 100) newProgress = 100;
 
@@ -42,7 +38,6 @@ const UploadPage: FC = () => {
 
     if (deltaProgress > 0) {
       const avgMsPerPercent = deltaTime / deltaProgress;
-
       if (smoothedMsPerPercent.current == null) {
         smoothedMsPerPercent.current = avgMsPerPercent;
       } else {
@@ -54,14 +49,13 @@ const UploadPage: FC = () => {
       const msPerPercent = smoothedMsPerPercent.current!;
       const remaining = 100 - newProgress;
       const etaMs = msPerPercent * remaining;
-
       setEta(etaMs > 1000 ? etaMs / 1000 : 0);
     }
 
     setProgress(newProgress);
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleZipUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !file.name.endsWith(".zip")) {
       setError("Please select a valid ZIP file");
@@ -76,17 +70,36 @@ const UploadPage: FC = () => {
       lastTimeRef.current = performance.now();
 
       await uploadData(file, onProgress);
-
       setProgress(100);
       setEta(0);
 
-      setTimeout(() => {
-        navigate("/");
-      }, 500);
+      setTimeout(() => window.location.replace("/"), 500);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to process file");
       setProgress(0);
       setEta(null);
+    }
+  };
+
+  const handlePrecomputedUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file || !file.name.endsWith(".json")) {
+      setError("Please select a valid JSON file");
+      return;
+    }
+
+    try {
+      setError(null);
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      localStorage.setItem("discord-processed-data", JSON.stringify(parsed));
+      setProgress(100);
+      setEta(0);
+      setTimeout(() => window.location.replace("/"), 300);
+    } catch (err) {
+      setError("Invalid precomputed data file");
     }
   };
 
@@ -109,106 +122,129 @@ const UploadPage: FC = () => {
             Upload Your Discord Data
           </h1>
           <p className="text-slate-600 dark:text-slate-300 mb-6">
-            All processing happens locally in your browser. Your data never
-            leaves your device.
+            Choose whether to upload your full Discord ZIP or a precomputed JSON
+            export. All processing happens locally in your browser.
           </p>
-          {/*}
-          <div className="mb-6 flex items-center space-x-3">
-            <input
-              id="ml-toggle"
-              type="checkbox"
-              checked={useMLSentiment}
-              onChange={(e) => setUseMLSentiment(e.target.checked)}
-              className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-            />
-            <label
-              htmlFor="ml-toggle"
-              className="text-sm font-medium text-slate-700 dark:text-slate-300"
-            >
-              Use ML-based sentiment analysis (slower)
-            </label>
-          </div>
-          */}
-          <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <p className="text-sm text-blue-800 dark:text-blue-300 font-medium mb-2">
-              📁 Your ZIP file should contain:
-            </p>
-            <ul className="text-sm text-blue-700 dark:text-blue-400 list-disc list-inside space-y-1">
-              <li>Account/user.json</li>
-              <li>Messages/ (with channel folders)</li>
-              <li>Servers/ (optional)</li>
-            </ul>
-          </div>
 
-          {!isLoading && !error && (
-            <label className="block cursor-pointer">
-              <div className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl p-12 text-center hover:border-indigo-500 dark:hover:border-indigo-400 transition-colors">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 items-stretch">
+            {isLoading ? (
+              <div className="col-span-1 md:col-span-2 flex justify-center items-center h-48">
                 <svg
-                  className="w-16 h-16 mx-auto mb-4 text-slate-400"
+                  className="animate-spin h-12 w-12 text-indigo-600 dark:text-indigo-400"
+                  xmlns="http://www.w3.org/2000/svg"
                   fill="none"
-                  stroke="currentColor"
                   viewBox="0 0 24 24"
                 >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
                   <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                  />
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8v8H4z"
+                  ></path>
                 </svg>
-                <p className="text-lg font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Click to select your Discord data package
-                </p>
-                <p className="text-sm text-slate-500 dark:text-slate-400">
-                  ZIP file only
-                </p>
+                <span className="ml-3 text-indigo-600 dark:text-indigo-400 font-medium">
+                  Uploading...
+                </span>
               </div>
-              <input
-                type="file"
-                accept=".zip"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
-            </label>
-          )}
+            ) : (
+              <>
+                <label className="block cursor-pointer h-full">
+                  <div className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl p-8 text-center flex flex-col justify-center hover:border-indigo-500 dark:hover:border-indigo-400 transition-colors h-full">
+                    <svg
+                      className="w-10 h-10 mx-auto mb-3 text-slate-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                      />
+                    </svg>
+                    <p className="text-lg font-medium mb-1 text-slate-700 dark:text-slate-300">
+                      Upload Raw Discord ZIP
+                    </p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      ZIP package from Discord export
+                    </p>
+                  </div>
+                  <input
+                    type="file"
+                    accept=".zip"
+                    onChange={handleZipUpload}
+                    className="hidden"
+                  />
+                </label>
+
+                <label className="block cursor-pointer h-full">
+                  <div className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl p-8 text-center flex flex-col justify-center hover:border-teal-500 dark:hover:border-teal-400 transition-colors h-full">
+                    <svg
+                      className="w-10 h-10 mx-auto mb-3 text-slate-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 4v16m8-8H4"
+                      />
+                    </svg>
+                    <p className="text-lg font-medium mb-1 text-slate-700 dark:text-slate-300">
+                      Upload Precomputed Data
+                    </p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      JSON file (exported earlier)
+                    </p>
+                  </div>
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handlePrecomputedUpload}
+                    className="hidden"
+                  />
+                </label>
+              </>
+            )}
+          </div>
 
           {isLoading && (
             <div>
-              <div className="mb-4">
-                <div className="flex justify-between mb-2">
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Processing your data...
-                  </span>
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    {progress.toFixed(1)}%
-                  </span>
-                </div>
-                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${progress}%` }}
-                    className="bg-indigo-600 h-3 rounded-full transition-all duration-300"
-                  />
-                </div>
+              <div className="flex justify-between mb-2">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Processing your data...
+                </span>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  {progress.toFixed(1)}%
+                </span>
               </div>
-
-              <div className="flex flex-col items-center justify-center py-8 space-y-2">
-                <div className="animate-spin h-12 w-12 border-4 border-indigo-500 border-t-transparent rounded-full" />
-                {eta !== null && eta > 0 && (
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
-                    Estimated time remaining: <strong>{formatETA(eta)}</strong>
-                  </p>
-                )}
+              <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progress}%` }}
+                  className="bg-indigo-600 h-3 rounded-full transition-all duration-300"
+                />
               </div>
-
-              <p className="text-center text-sm text-slate-600 dark:text-slate-400">
-                This may take a minute for large data packages...
-              </p>
+              {eta && eta > 0 && (
+                <p className="text-center text-sm text-slate-500 dark:text-slate-400 mt-3">
+                  Estimated time remaining: {formatETA(eta)}
+                </p>
+              )}
             </div>
           )}
 
           {error && (
-            <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <div className="p-4 mt-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
               <p className="text-red-800 dark:text-red-300 font-medium mb-1">
                 Error:
               </p>
@@ -227,15 +263,6 @@ const UploadPage: FC = () => {
               </button>
             </div>
           )}
-
-          <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
-            <button
-              onClick={() => navigate("/")}
-              className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
-            >
-              ← Back to home
-            </button>
-          </div>
         </div>
       </motion.div>
     </div>
