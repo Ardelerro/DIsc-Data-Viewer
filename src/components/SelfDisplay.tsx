@@ -1,7 +1,7 @@
 import type { FC } from "react";
 import { motion } from "framer-motion";
 import { useData } from "../context/DataContext";
-import { User, MessageSquare, Users, Paperclip, Smile, PhoneCall, Headphones, Monitor } from "lucide-react";
+import { User, MessageSquare, Users, Paperclip, Smile, PhoneCall, Headphones, Monitor, BookUser } from "lucide-react";
 
 const SelfDisplay: FC = () => {
   const { data } = useData();
@@ -36,7 +36,7 @@ const SelfDisplay: FC = () => {
   };
 
   const totalMessages = aggregateStats?.messageCount ?? 0;
-
+  const totalChannels = Object.keys(channelStats).length;
   let minDate = Infinity;
   let maxDate = -Infinity;
 
@@ -106,6 +106,7 @@ const SelfDisplay: FC = () => {
           <Stat icon={<Headphones />} label="Voice channels joined" value={activity.joinVoice} />
           <Stat icon={<PhoneCall />} label="DM calls" value={activity.joinCall + activity.startCall} />
           <Stat icon={<Monitor />} label="Discord opened" value={activity.appOpened} />
+          <Stat icon={<BookUser />} label="Total channels" value={totalChannels.toLocaleString()} />
         </div>
       )}
     </motion.div>

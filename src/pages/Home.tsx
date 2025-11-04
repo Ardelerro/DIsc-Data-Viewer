@@ -1,41 +1,71 @@
-import type {
-  FC
-} from "react";
+import type { FC } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useState } from "react";
 import { useData } from "../context/DataContext";
 import TopUsers from "../components/TopUsers";
 import TopChannels from "../components/TopChannels";
 import TopServers from "../components/TopServers";
 import TopStreaks from "../components/TopStreaks";
 import SelfDisplay from "../components/SelfDisplay";
+import HourlyChart from "../components/HourlyChart";
+import HourlyMoodChart from "../components/HourlyMoodChart";
+import SettingsModal from "../components/SettingsModal";
+import type { ShowElementsState } from "../types/types";
+import MonthlyChart from "../components/MonthlyChart";
 
 const Home: FC = () => {
   const { data, clearData } = useData();
+  const [showSettings, setShowSettings] = useState(false);
+  const [showElements, setShowElements] = useState<ShowElementsState>({
+    topUsers: true,
+    topChannels: true,
+    topServers: true,
+    topStreaks: true,
+    hourlyCharts: true,
+    monthlyCharts: true,
+    moodChart: true,
+  });
+  const [theme, setTheme] = useState<"light" | "dark">(
+    document.documentElement.classList.contains("dark") ? "dark" : "light"
+  );
 
-  // If no data, show upload prompt
+  const toggleTheme = () => {
+    const newTheme = theme === "light" ? "dark" : "light";
+    setTheme(newTheme);
+    if (newTheme === "dark") document.documentElement.classList.add("dark");
+    else document.documentElement.classList.remove("dark");
+  };
+
+  const handleDownloadData = () => {
+    if (!data) return;
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "discord_processed_data.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (!data) {
     return (
       <div className="min-h-screen w-full bg-gradient-to-br from-indigo-50 via-white to-teal-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800">
-        <div className="max-w-2xl mx-auto px-4 py-16">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center"
+        <div className="max-w-2xl mx-auto px-4 py-16 text-center">
+          <h1 className="text-4xl font-bold mb-4 text-slate-900 dark:text-white">
+            Discord Stats Dashboard
+          </h1>
+          <p className="text-lg text-slate-600 dark:text-slate-300 mb-8">
+            Upload your Discord data package to get started
+          </p>
+          <Link
+            to="/upload"
+            className="inline-block px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors"
           >
-            <h1 className="text-4xl font-bold mb-4 text-slate-900 dark:text-white">
-              Discord Stats Dashboard
-            </h1>
-            <p className="text-lg text-slate-600 dark:text-slate-300 mb-8">
-              Upload your Discord data package to get started
-            </p>
-            <Link
-              to="/upload"
-              className="inline-block px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors"
-            >
-              Upload Data Package
-            </Link>
-          </motion.div>
+            Upload Data Package
+          </Link>
         </div>
       </div>
     );
@@ -53,90 +83,26 @@ const Home: FC = () => {
               Welcome back, {data.self.username}!
             </p>
           </div>
-          <button
-            onClick={clearData}
-            className="px-4 py-2 text-sm bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300 rounded-lg transition-colors"
-          >
-            Clear Data
-          </button>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowSettings(true)}
+              className="px-4 py-2 text-sm bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 rounded-lg transition-colors"
+            >
+              Settings ⚙️
+            </button>
+            <button
+              onClick={clearData}
+              className="px-4 py-2 text-sm bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300 rounded-lg transition-colors"
+            >
+              Clear Data
+            </button>
+          </div>
         </div>
 
         <div className="mb-8">
           <SelfDisplay />
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="p-6 rounded-xl bg-white/90 dark:bg-slate-800/80 backdrop-blur-xl shadow-lg ring-1 ring-slate-200 dark:ring-slate-700"
-          >
-            <h3 className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
-              Total Messages
-            </h3>
-            <p className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">
-              {data.aggregateStats.messageCount.toLocaleString()}
-            </p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="p-6 rounded-xl bg-white/90 dark:bg-slate-800/80 backdrop-blur-xl shadow-lg ring-1 ring-slate-200 dark:ring-slate-700"
-          >
-            <h3 className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
-              Avg. Time Between Messages
-            </h3>
-            <p className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">
-              {Math.round(data.aggregateStats.averageGapBetweenMessages / 60)}{" "}
-              min
-            </p>
-          </motion.div>
-
-<motion.div
-  initial={{ opacity: 0, y: 20 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{ delay: 0.3 }}
-  className="group relative p-6 rounded-xl bg-white/90 dark:bg-slate-800/80 backdrop-blur-xl shadow-lg ring-1 ring-slate-200 dark:ring-slate-700 overflow-hidden hover:ring-indigo-300 dark:hover:ring-indigo-600 transition-all"
->
-  <h3 className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
-    Most Used Words
-  </h3>
-  <p className="text-3xl font-bold text-indigo-600 dark:text-indigo-400 transition-all duration-300">
-    {data.aggregateStats.topWords?.[0] || "N/A"}
-  </p>
-  <p className="text-xs text-slate-500 dark:text-slate-400 italic mt-1">
-    Hover to see more frequently used words
-  </p>
-
-  <motion.div
-    initial={{ opacity: 0, y: 10 }}
-    whileHover={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.3 }}
-    className="absolute left-0 right-0 bottom-0 translate-y-full group-hover:translate-y-0 group-hover:opacity-100 opacity-0 p-4 bg-white/95 dark:bg-slate-800/95 border-t border-slate-200 dark:border-slate-700 rounded-b-xl backdrop-blur-xl"
-  >
-    <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-      Top 5 Words Overall
-    </h4>
-    <ol className="list-decimal list-inside space-y-1 text-slate-600 dark:text-slate-400 text-sm">
-      {data.aggregateStats.topWords?.slice(0, 5).map((word: string, i: number) => (
-        <li key={word}>
-          {i === 0 ? (
-            <span className="font-semibold text-indigo-600 dark:text-indigo-400">
-              {word}
-            </span>
-          ) : (
-            word
-          )}
-        </li>
-      ))}
-    </ol>
-  </motion.div>
-</motion.div>
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
           <Link to="/search">
             <motion.div
@@ -164,14 +130,37 @@ const Home: FC = () => {
             </motion.div>
           </Link>
         </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <TopUsers />
-          <TopStreaks />
-          <TopChannels />
-          <TopServers />
+          {showElements.moodChart && (
+            <HourlyMoodChart className="col-span-1 lg:col-span-2" />
+          )}
+          {showElements.hourlyCharts && (
+            <HourlyChart
+              data={data.aggregateStats.hourly}
+              className="col-span-1 lg:col-span-2"
+            />
+          )}
+          {showElements.monthlyCharts && (
+            <MonthlyChart
+              data={data.aggregateStats.monthly}
+              className="col-span-1 lg:col-span-2"
+            />
+          )}
+          {showElements.topUsers && <TopUsers />}
+          {showElements.topStreaks && <TopStreaks />}
+          {showElements.topChannels && <TopChannels />}
+          {showElements.topServers && <TopServers />}
         </div>
       </div>
+      <SettingsModal
+        showSettings={showSettings}
+        theme={theme}
+        showElements={showElements}
+        setShowSettings={setShowSettings}
+        toggleTheme={toggleTheme}
+        setShowElements={setShowElements}
+        handleDownloadData={handleDownloadData}
+      />
     </div>
   );
 };

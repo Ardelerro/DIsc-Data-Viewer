@@ -1,4 +1,3 @@
-// src/components/TopServers.tsx
 import type { FC } from "react";
 import { useMemo } from "react";
 import { motion } from "framer-motion";

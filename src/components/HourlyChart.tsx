@@ -14,9 +14,10 @@ import { motion } from "framer-motion";
 interface HourlyChartProps {
     data: Record<string, number>;
     className?: string;
+    title?: string;
 }
 
-const HourlyChart: FC<HourlyChartProps> = ({ data, className = "" }) => {
+const HourlyChart: FC<HourlyChartProps> = ({ data, className = "", title }) => {
     const chartData = useMemo(() => {
         return Array.from({ length: 24 }, (_, i) => {
             const hour = i.toString().padStart(2, "0");
@@ -32,7 +33,7 @@ const HourlyChart: FC<HourlyChartProps> = ({ data, className = "" }) => {
             className={`text-slate-900 dark:text-slate-100 rounded-md ring-1 ring-slate-200 dark:ring-slate-700 bg-white/90 dark:bg-slate-800/80 backdrop-blur-xl shadow-lg p-6 ${className}`}
         >
             <h2 className="mb-4 text-lg font-semibold leading-none text-slate-900 dark:text-slate-100">
-                Hourly Message Frequency
+                {title || "Hourly Message Frequency"}
             </h2>
             <ResponsiveContainer width="100%" height={320} minWidth={250}>
                 <BarChart data={chartData} margin={{ top: 12, right: 18, bottom: 10, left: 12 }}>
