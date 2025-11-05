@@ -2,6 +2,7 @@ import type { FC } from "react";
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { useData } from "../context/DataContext";
+import React from "react";
 
 interface ChannelInfo {
   channelId: string;
@@ -103,4 +104,4 @@ const TopChannels: FC<{ className?: string }> = ({ className = "" }) => {
   );
 };
 
-export default TopChannels;
+export default React.memo(TopChannels);

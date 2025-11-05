@@ -10,6 +10,7 @@ import {
     Tooltip,
 } from "recharts";
 import { motion } from "framer-motion";
+import React from "react";
 
 interface MonthlyChartProps {
     data: Record<string, number>;
@@ -78,4 +79,4 @@ const chartData = useMemo(() => {
     );
 };
 
-export default MonthlyChart;
+export default React.memo(MonthlyChart);

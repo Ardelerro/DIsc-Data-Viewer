@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import type { FC } from "react";
+import React from "react";
 
 interface StatProps {
   icon: React.ReactNode;
@@ -21,4 +22,4 @@ const Stat: FC<StatProps> = ({ icon, label, value }) => (
   </motion.div>
 );
 
-export default Stat;
+export default React.memo(Stat);

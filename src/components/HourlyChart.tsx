@@ -10,6 +10,7 @@ import {
     CartesianGrid,
 } from "recharts";
 import { motion } from "framer-motion";
+import React from "react";
 
 interface HourlyChartProps {
     data: Record<string, number>;
@@ -60,4 +61,4 @@ const HourlyChart: FC<HourlyChartProps> = ({ data, className = "", title }) => {
     );
 };
 
-export default HourlyChart;
+export default React.memo(HourlyChart);

@@ -2,6 +2,7 @@ import type { FC } from "react";
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { useData } from "../context/DataContext";
+import React from "react";
 
 interface UserStats {
   channelId: string;
@@ -130,4 +131,4 @@ const TopUsers: FC<{ className?: string }> = ({ className = "" }) => {
   );
 };
 
-export default TopUsers;
+export default React.memo(TopUsers);

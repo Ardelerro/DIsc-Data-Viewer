@@ -2,6 +2,7 @@ import type { FC } from "react";
 import { motion } from "framer-motion";
 import { useData } from "../context/DataContext";
 import { User, MessageSquare, Users, Paperclip, Smile, PhoneCall, Headphones, Monitor, BookUser } from "lucide-react";
+import React from "react";
 
 const SelfDisplay: FC = () => {
   const { data } = useData();
@@ -133,4 +134,4 @@ const Stat: FC<StatProps> = ({ icon, label, value }) => (
   </motion.div>
 );
 
-export default SelfDisplay;
+export default React.memo(SelfDisplay);

@@ -1,7 +1,7 @@
 import type { FC } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useData } from "../context/DataContext";
 import TopUsers from "../components/TopUsers";
 import TopChannels from "../components/TopChannels";
@@ -30,14 +30,16 @@ const Home: FC = () => {
     document.documentElement.classList.contains("dark") ? "dark" : "light"
   );
 
-  const toggleTheme = () => {
-    const newTheme = theme === "light" ? "dark" : "light";
-    setTheme(newTheme);
-    if (newTheme === "dark") document.documentElement.classList.add("dark");
-    else document.documentElement.classList.remove("dark");
-  };
+  const toggleTheme = useCallback(() => {
+    setTheme((prevTheme) => {
+      const newTheme = prevTheme === "light" ? "dark" : "light";
+      if (newTheme === "dark") document.documentElement.classList.add("dark");
+      else document.documentElement.classList.remove("dark");
+      return newTheme;
+    });
+  }, []);
 
-  const handleDownloadData = () => {
+  const handleDownloadData = useCallback(() => {
     if (!data) return;
     const blob = new Blob([JSON.stringify(data, null, 2)], {
       type: "application/json",
@@ -48,7 +50,15 @@ const Home: FC = () => {
     a.download = "discord_processed_data.json";
     a.click();
     URL.revokeObjectURL(url);
-  };
+  }, [data]);
+
+  const handleClearData = useCallback(() => {
+    clearData();
+  }, [clearData]);
+
+  // ✅ Memoize chart data so re-renders don’t cascade into child components
+  const memoizedHourly = useMemo(() => data?.aggregateStats.hourly, [data]);
+  const memoizedMonthly = useMemo(() => data?.aggregateStats.monthly, [data]);
 
   if (!data) {
     return (
@@ -92,7 +102,7 @@ const Home: FC = () => {
               Settings ⚙️
             </button>
             <button
-              onClick={clearData}
+              onClick={handleClearData}
               className="px-4 py-2 text-sm bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300 rounded-lg transition-colors"
             >
               Clear Data
@@ -103,6 +113,7 @@ const Home: FC = () => {
         <div className="mb-8">
           <SelfDisplay />
         </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
           <Link to="/search">
             <motion.div
@@ -130,19 +141,20 @@ const Home: FC = () => {
             </motion.div>
           </Link>
         </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {showElements.moodChart && (
             <HourlyMoodChart className="col-span-1 lg:col-span-2" />
           )}
           {showElements.hourlyCharts && (
             <HourlyChart
-              data={data.aggregateStats.hourly}
+              data={memoizedHourly}
               className="col-span-1 lg:col-span-2"
             />
           )}
           {showElements.monthlyCharts && (
             <MonthlyChart
-              data={data.aggregateStats.monthly}
+              data={memoizedMonthly}
               className="col-span-1 lg:col-span-2"
             />
           )}
@@ -152,6 +164,7 @@ const Home: FC = () => {
           {showElements.topServers && <TopServers />}
         </div>
       </div>
+
       <SettingsModal
         showSettings={showSettings}
         theme={theme}
