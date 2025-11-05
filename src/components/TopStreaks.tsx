@@ -2,6 +2,7 @@ import type { FC } from "react";
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { useData } from "../context/DataContext";
+import React from "react";
 
 interface StreakStats {
   channelId: string;
@@ -145,4 +146,4 @@ const TopStreaks: FC<{ className?: string }> = ({ className = "" }) => {
   );
 };
 
-export default TopStreaks;
+export default React.memo(TopStreaks);

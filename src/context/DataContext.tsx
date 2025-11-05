@@ -4,6 +4,7 @@ import React, {
   useState,
   useEffect,
   type FC,
+  useMemo,
 } from "react";
 import JSZip from "jszip";
 import type { DataContextType, ProcessedData } from "../types/discord";
@@ -85,11 +86,12 @@ export const DataProvider: FC<{ children: React.ReactNode }> = ({
     setData(null);
     localStorage.removeItem("discord-processed-data");
   };
-
+  const contextValue = useMemo(
+    () => ({ data, isLoading, error, uploadData, clearData }),
+    [data, isLoading, error]
+  );
   return (
-    <DataContext.Provider
-      value={{ data, isLoading, error, uploadData, clearData }}
-    >
+    <DataContext.Provider value={contextValue}>
       {children}
     </DataContext.Provider>
   );

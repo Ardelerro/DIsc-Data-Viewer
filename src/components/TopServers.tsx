@@ -2,6 +2,7 @@ import type { FC } from "react";
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { useData } from "../context/DataContext";
+import React from "react";
 
 interface ServerStats {
   serverId: string;
@@ -97,4 +98,4 @@ const TopServers: FC<{ className?: string }> = ({ className = "" }) => {
   );
 };
 
-export default TopServers;
+export default React.memo(TopServers);
