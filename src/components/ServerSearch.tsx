@@ -2,37 +2,53 @@ import type { FC } from "react";
 import { useState, useMemo } from "react";
 import HourlyChart from "../components/HourlyChart";
 import MonthlyChart from "../components/MonthlyChart";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useData } from "../context/DataContext";
-
-interface ChannelStats {
-  hourly: Record<string, number>;
-  monthly: Record<string, number>;
-  recipientName?: string;
-}
-
-interface TopChannel {
-  name: string;
-  totalMessages: number;
-}
+import { BookUser, MessageSquare, Clock, Calendar } from "lucide-react";
+import Stat from "./Stat";
+import type { ChannelStats, TopChannel } from "../types/discord";
 
 const ServerSearch: FC = () => {
   const { data } = useData();
   const [selectedServer, setSelectedServer] = useState<string | null>(null);
 
-  const serverOptions = useMemo(() => {
+  const rankedServers = useMemo(() => {
     if (!data) return [];
-    return Object.entries(data.serverMapping.serverNames)
-      .sort(([, nameA], [, nameB]) => nameA.localeCompare(nameB))
-      .map(([id, name]) => (
-        <option key={id} value={id}>
-          {name}
-        </option>
-      ));
+
+    const serverTotals = Object.entries(data.serverMapping.serverNames).map(
+      ([id, name]) => {
+        const channels = Object.entries(data.serverMapping.channelToServer)
+          .filter(([_, sid]) => sid === id)
+          .map(([channelId]) => data.channelStats[`channel_${channelId}`])
+          .filter(Boolean) as ChannelStats[];
+
+        const total = channels.reduce(
+          (sum, c) =>
+            sum + Object.values(c.hourly || {}).reduce((a, b) => a + b, 0),
+          0
+        );
+
+        return { id, name, total };
+      }
+    );
+
+    serverTotals.sort((a, b) => b.total - a.total);
+    return serverTotals.map((s, i) => ({ ...s, rank: i + 1 }));
   }, [data]);
 
+  const serverOptions = useMemo(
+    () =>
+      rankedServers.map(({ id, name, rank }) => (
+        <option key={id} value={id}>
+          #{rank} — {name}
+        </option>
+      )),
+    [rankedServers]
+  );
+
   const { aggregateData, topChannels } = useMemo(() => {
-    if (!data || !selectedServer) return { aggregateData: null, topChannels: [] };
+    if (!data || !selectedServer)
+      return { aggregateData: null, topChannels: [] };
 
     const channelsInServer = Object.entries(data.serverMapping.channelToServer)
       .filter(([_, sid]) => sid === selectedServer)
@@ -45,7 +61,9 @@ const ServerSearch: FC = () => {
         allData.push({
           ...stats,
           recipientName:
-            data.channelNaming[channelId] || stats.recipientName || `#${channelId}`,
+            data.channelNaming[channelId] ||
+            stats.recipientName ||
+            `#${channelId}`,
         });
       }
     }
@@ -60,7 +78,7 @@ const ServerSearch: FC = () => {
       }
     }
 
-    const channelTotals: TopChannel[] = allData
+    const topChannels: TopChannel[] = allData
       .map((d) => ({
         name: d.recipientName ?? "Unknown",
         totalMessages: Object.values(d.hourly || {}).reduce((a, b) => a + b, 0),
@@ -68,136 +86,197 @@ const ServerSearch: FC = () => {
       .sort((a, b) => b.totalMessages - a.totalMessages)
       .slice(0, 10);
 
-    return { aggregateData: merged, topChannels: channelTotals };
+    return { aggregateData: merged, topChannels };
   }, [data, selectedServer]);
+
+  const totalMessages = useMemo(() => {
+    if (!aggregateData) return 0;
+    return Object.values(aggregateData.hourly).reduce((a, b) => a + b, 0);
+  }, [aggregateData]);
+
+  const selectedName = useMemo(() => {
+    const match = rankedServers.find((s) => s.id === selectedServer);
+    return match ? match.name : null;
+  }, [rankedServers, selectedServer]);
+
+  const serverRank = useMemo(() => {
+    const match = rankedServers.find((s) => s.id === selectedServer);
+    return match ? match.rank : null;
+  }, [rankedServers, selectedServer]);
 
   if (!data)
     return (
-      <div className="text-center text-slate-600 dark:text-slate-300">
+      <div className="px-4 py-8 text-center text-slate-600 dark:text-slate-300">
         No data loaded. Please upload your Discord ZIP file first.
       </div>
     );
 
-  const selectedName =
-    selectedServer && data.serverMapping.serverNames[selectedServer]
-      ? data.serverMapping.serverNames[selectedServer]
-      : null;
+  function getAllianceDurationMessage(firstTimestamp?: string): string | null {
+    if (!firstTimestamp) return null;
+    const first = new Date(firstTimestamp);
+    const now = new Date();
+    const diffDays = Math.floor(
+      (now.getTime() - first.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    const years = Math.floor(diffDays / 365);
+    const months = Math.floor((diffDays % 365) / 30);
+    const weeks = Math.floor((diffDays % 30) / 7);
+
+    if (years > 1)
+      return `You've been in this server for ${years} years${
+        months > 0 ? ` and ${months} months` : ""
+      }.`;
+    if (years === 1)
+      return `You've been in this server for 1 year${
+        months > 0 ? ` and ${months} months` : ""
+      }.`;
+    if (months > 2) return `You've been in this server for ${months} months.`;
+    if (months >= 1) return `You've been in this server for about a month.`;
+    if (weeks > 1) return `You've been in this server for ${weeks} weeks.`;
+    if (weeks === 1) return `You've been in this server for a week.`;
+    if (diffDays > 2) return `You've been in this server for ${diffDays} days.`;
+    if (diffDays === 1) return `You joined yesterday.`;
+    return `You just joined!`;
+  }
+
+  function getFirstTimestampFromChannels(): string | null {
+    if (!data || !selectedServer) return null;
+
+    const channelsInServer = Object.entries(data.serverMapping.channelToServer)
+      .filter(([_, sid]) => sid === selectedServer)
+      .map(([channelId]) => `channel_${channelId}`);
+
+    let oldestTimestamp: string | null = null;
+    for (const channelId of channelsInServer) {
+      const stats = data.channelStats[channelId];
+      if (stats && stats.firstMessageTimestamp) {
+        if (!oldestTimestamp || stats.firstMessageTimestamp < oldestTimestamp) {
+          oldestTimestamp = stats.firstMessageTimestamp;
+        }
+      }
+    }
+
+    return oldestTimestamp;
+  }
 
   return (
-    <div className="max-w-4xl mx-auto px-4">
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-8">
-        Server Statistics
-      </h1>
-
+    <div className="max-w-5xl mx-auto px-4">
       <motion.div
-        className="mb-10"
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
+        className="p-6 rounded-2xl bg-white/80 dark:bg-slate-800/70 backdrop-blur-xl shadow-lg ring-1 ring-slate-200 dark:ring-slate-700"
       >
-        <label className="block mb-3 text-sm text-slate-700 dark:text-slate-300 font-medium">
-          Select a server
-        </label>
-        <motion.select
-          value={selectedServer ?? ""}
-          onChange={(e) => setSelectedServer(e.target.value || null)}
-          className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm hover:shadow-md transition-all duration-200 focus:ring-2 focus:ring-indigo-500"
-          whileFocus={{ scale: 1.02 }}
-        >
-          <option value="" disabled>
-            -- Choose a server --
-          </option>
-          {serverOptions}
-        </motion.select>
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-3 bg-indigo-100 dark:bg-indigo-900/40 rounded-xl text-indigo-600 dark:text-indigo-400">
+            <BookUser size={24} />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+              Search Servers
+            </h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Explore your message history by server
+            </p>
+          </div>
+        </div>
 
-        <AnimatePresence mode="wait">
-          {selectedName && (
-            <motion.p
-              key={selectedName}
-              initial={{ opacity: 0, y: -5 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -5 }}
-              transition={{ duration: 0.3 }}
-              className="mt-2 text-sm text-slate-500 dark:text-slate-400"
-            >
-              Viewing stats for <span className="font-medium">{selectedName}</span>
-            </motion.p>
-          )}
-        </AnimatePresence>
-      </motion.div>
+        <div className="mb-6">
+          <label className="block mb-3 text-sm text-slate-700 dark:text-slate-300 font-medium">
+            Select a server
+          </label>
+          <motion.select
+            value={selectedServer ?? ""}
+            onChange={(e) => setSelectedServer(e.target.value || null)}
+            className="w-full px-4 py-3 rounded-xl bg-white/60 dark:bg-slate-700/50 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:outline-none transition-all"
+            whileFocus={{ scale: 1.02 }}
+          >
+            <option value="" disabled>
+              Choose a server
+            </option>
+            {serverOptions}
+          </motion.select>
+        </div>
 
-      <AnimatePresence>
         {aggregateData && (
           <motion.div
-            key="charts"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.4 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
             className="space-y-8"
           >
-            <div className="text-center">
-              <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">
-                Aggregate Activity for{" "}
-                <span className="text-indigo-600 dark:text-indigo-400 font-bold">
-                  {selectedName}
-                </span>
+            <div>
+              <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+                {selectedName}
               </h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Rank #{serverRank} —{" "}
+                {getAllianceDurationMessage(
+                  getFirstTimestampFromChannels() || undefined
+                ) || "No messages found in this server."}
+              </p>
             </div>
 
-            <motion.div
-              className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl shadow-sm p-4 hover:shadow-md transition-all"
-              whileHover={{ scale: 1.01 }}
-            >
-              <HourlyChart data={aggregateData.hourly} />
-            </motion.div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+              <Stat
+                icon={<MessageSquare />}
+                label="Total Messages"
+                value={totalMessages.toLocaleString()}
+              />
+              <Stat
+                icon={<Clock />}
+                label="Active Channels"
+                value={topChannels.length.toLocaleString()}
+              />
+              {aggregateData.monthly && (
+                <Stat
+                  icon={<Calendar />}
+                  label="Months Active"
+                  value={Object.keys(aggregateData.monthly).length.toString()}
+                />
+              )}
+            </div>
 
-            <motion.div
-              className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl shadow-sm p-4 hover:shadow-md transition-all"
-              whileHover={{ scale: 1.01 }}
-            >
-              <MonthlyChart data={aggregateData.monthly} />
-            </motion.div>
+            <HourlyChart data={aggregateData.hourly} />
+            <MonthlyChart data={aggregateData.monthly} />
 
-            <motion.div
-              className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl shadow-sm p-4"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.1, duration: 0.4 }}
-            >
+            <div>
               <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">
                 Top Channels
               </h3>
-              <table className="min-w-full table-auto text-base text-slate-700 dark:text-slate-200">
-                <thead>
-                  <tr className="bg-slate-100 dark:bg-slate-700/40 text-left text-lg">
-                    <th className="px-4 py-2 font-medium">Rank</th>
-                    <th className="px-4 py-2 font-medium">Channel</th>
-                    <th className="px-4 py-2 font-medium">Messages</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topChannels.map((c, i) => (
-                    <motion.tr
-                      key={c.name}
-                      className="even:bg-slate-50 dark:even:bg-slate-700/30 hover:bg-indigo-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer"
-                      whileHover={{ scale: 1.01 }}
-                    >
-                      <td className="px-6 py-3 font-semibold text-lg text-slate-600 dark:text-slate-300">
-                        #{i + 1}
-                      </td>
-                      <td className="px-6 py-3">{c.name}</td>
-                      <td className="px-6 py-3 text-indigo-600 dark:text-indigo-400 text-lg font-medium">
-                        {c.totalMessages.toLocaleString()}
-                      </td>
-                    </motion.tr>
-                  ))}
-                </tbody>
-              </table>
-            </motion.div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full table-auto text-sm text-slate-700 dark:text-slate-200">
+                  <thead>
+                    <tr className="bg-slate-100 dark:bg-slate-700/40 text-left">
+                      <th className="px-4 py-2 font-medium">Rank</th>
+                      <th className="px-4 py-2 font-medium">Channel</th>
+                      <th className="px-4 py-2 font-medium">Messages</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topChannels.map((c, i) => (
+                      <motion.tr
+                        key={c.name}
+                        className="even:bg-white/50 dark:even:bg-slate-700/30 hover:bg-indigo-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer"
+                        whileHover={{ scale: 1.01 }}
+                      >
+                        <td className="px-6 py-3 font-semibold text-slate-600 dark:text-slate-300">
+                          #{i + 1}
+                        </td>
+                        <td className="px-6 py-3">{c.name}</td>
+                        <td className="px-6 py-3 text-indigo-600 dark:text-indigo-400 font-medium">
+                          {c.totalMessages.toLocaleString()}
+                        </td>
+                      </motion.tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </motion.div>
         )}
-      </AnimatePresence>
+      </motion.div>
     </div>
   );
 };

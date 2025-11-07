@@ -3,12 +3,7 @@ import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { useData } from "../context/DataContext";
 import React from "react";
-
-interface ServerStats {
-  serverId: string;
-  name: string;
-  totalMessages: number;
-}
+import type { ServerStats } from "../types/discord";
 
 const TopServers: FC<{ className?: string }> = ({ className = "" }) => {
   const { data, isLoading } = useData();

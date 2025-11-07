@@ -1,19 +1,11 @@
 import { AnimatePresence, motion } from "framer-motion";
 import type { FC } from "react";
 import { useState, useMemo } from "react";
+import type { SentimentStats } from "../types/discord";
 
-interface SentimentStats {
-  average: number;
-  positive: number;
-  negative: number;
-  neutral: number;
-}
 
-interface SentimentBarProps {
-  sentiment: SentimentStats;
-}
 
-const SentimentBar: FC<SentimentBarProps> = ({ sentiment }) => {
+const SentimentBar: FC<{ sentiment: SentimentStats }> = ({ sentiment }) => {
   const [hovered, setHovered] = useState<string | null>(null);
 
   const mapSentimentToLogScale = (value: number): number => {

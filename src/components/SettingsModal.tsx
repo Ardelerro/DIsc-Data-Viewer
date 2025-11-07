@@ -1,17 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import * as Switch from "@radix-ui/react-switch";
-import type { ShowElementsState } from "../types/types";
-
-interface SettingsModalProps {
-  showSettings: boolean;
-  theme: "light" | "dark";
-  showElements: ShowElementsState;
-  setShowSettings: (value: boolean) => void;
-  toggleTheme: () => void;
-  setShowElements: React.Dispatch<React.SetStateAction<ShowElementsState>>;
-  handleDownloadData: () => void;
-}
-
+import type { SettingsModalProps } from "../types/types";
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
   showSettings,

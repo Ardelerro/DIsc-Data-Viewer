@@ -11,11 +11,7 @@ import {
 } from "recharts";
 import { motion } from "framer-motion";
 import React from "react";
-
-interface MonthlyChartProps {
-    data: Record<string, number>;
-    className?: string;
-}
+import type { MonthlyChartProps } from "../types/types";
 
 const MonthlyChart: FC<MonthlyChartProps> = ({ data, className = "" }) => {
 const chartData = useMemo(() => {

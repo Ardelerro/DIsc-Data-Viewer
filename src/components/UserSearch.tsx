@@ -7,22 +7,7 @@ import { useData } from "../context/DataContext";
 import { User, MessageSquare, Clock, Calendar } from "lucide-react";
 import Stat from "./Stat";
 import SentimentBar from "./SentimentBar";
-
-interface SentimentStats {
-  average: number;
-  positive: number;
-  negative: number;
-  neutral: number;
-}
-
-interface ChannelStats {
-  hourly: Record<string, number>;
-  monthly: Record<string, number>;
-  recipientName: string;
-  averageGapBetweenMessages?: number;
-  sentiment?: SentimentStats;
-  firstMessageTimestamp?: string;
-}
+import type { ChannelStats } from "../types/discord";
 
 const UserSearch: FC = () => {
   const { data } = useData();
@@ -95,18 +80,18 @@ const UserSearch: FC = () => {
     const weeks = Math.floor((diffDays % 30) / 7);
 
     if (years > 1)
-      return `You’ve known them for ${years} years${
+      return `You've known them for ${years} years${
         months > 0 ? ` and ${months} months` : ""
       }.`;
     if (years === 1)
-      return `You’ve known them for 1 year${
+      return `You've known them for 1 year${
         months > 0 ? ` and ${months} months` : ""
       }.`;
-    if (months > 2) return `You’ve known them for ${months} months.`;
-    if (months >= 1) return `You’ve known them for about a month.`;
-    if (weeks > 1) return `You’ve known them for ${weeks} weeks.`;
-    if (weeks === 1) return `You’ve known them for a week.`;
-    if (diffDays > 2) return `You’ve known them for ${diffDays} days.`;
+    if (months > 2) return `You've known them for ${months} months.`;
+    if (months >= 1) return `You've known them for about a month.`;
+    if (weeks > 1) return `You've known them for ${weeks} weeks.`;
+    if (weeks === 1) return `You've known them for a week.`;
+    if (diffDays > 2) return `You've known them for ${diffDays} days.`;
     if (diffDays === 1) return `You started chatting yesterday.`;
     return `You just started chatting!`;
   }
@@ -137,16 +122,17 @@ const UserSearch: FC = () => {
           <label className="block mb-3 text-sm text-slate-700 dark:text-slate-300 font-medium">
             Select a user
           </label>
-          <select
-            value={selectedUser ?? ""}
-            onChange={(e) => setSelectedUser(e.target.value || null)}
-            className="w-full px-4 py-3 rounded-xl bg-white/60 dark:bg-slate-700/50 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:outline-none transition-all"
-          >
-            <option value="" disabled>
-              Choose a user
-            </option>
-            {userOptions}
-          </select>
+        <motion.select
+          value={selectedUser ?? ""}
+          onChange={(e) => setSelectedUser(e.target.value || null)}
+          className="w-full px-4 py-3 rounded-xl bg-white/60 dark:bg-slate-700/50 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:outline-none transition-all"
+          whileFocus={{ scale: 1.02 }}
+        >
+          <option value="" disabled>
+            Choose a user
+          </option>
+          {userOptions}
+        </motion.select>
         </div>
 
         {channelData && (
