@@ -3,13 +3,9 @@ import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { useData } from "../context/DataContext";
 import React from "react";
+import type { ChannelInfo } from "../types/discord";
 
-interface ChannelInfo {
-  channelId: string;
-  name: string;
-  totalMessages: number;
-  serverName: string;
-}
+
 
 const TopChannels: FC<{ className?: string }> = ({ className = "" }) => {
   const { data } = useData();

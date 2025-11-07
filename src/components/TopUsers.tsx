@@ -3,14 +3,9 @@ import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { useData } from "../context/DataContext";
 import React from "react";
+import type { UserStats } from "../types/discord";
 
-interface UserStats {
-  channelId: string;
-  userId?: string;
-  name: string;
-  avatar?: string;
-  count: number;
-}
+
 
 const TopUsers: FC<{ className?: string }> = ({ className = "" }) => {
   const { data } = useData();

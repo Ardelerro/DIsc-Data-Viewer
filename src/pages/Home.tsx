@@ -56,7 +56,6 @@ const Home: FC = () => {
     clearData();
   }, [clearData]);
 
-  // ✅ Memoize chart data so re-renders don’t cascade into child components
   const memoizedHourly = useMemo(() => data?.aggregateStats.hourly, [data]);
   const memoizedMonthly = useMemo(() => data?.aggregateStats.monthly, [data]);
 

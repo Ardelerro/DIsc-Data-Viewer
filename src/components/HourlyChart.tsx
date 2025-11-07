@@ -11,12 +11,7 @@ import {
 } from "recharts";
 import { motion } from "framer-motion";
 import React from "react";
-
-interface HourlyChartProps {
-    data: Record<string, number>;
-    className?: string;
-    title?: string;
-}
+import type { HourlyChartProps } from "../types/types";
 
 const HourlyChart: FC<HourlyChartProps> = ({ data, className = "", title }) => {
     const chartData = useMemo(() => {

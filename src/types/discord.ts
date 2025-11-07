@@ -1,4 +1,3 @@
-
 interface Self {
   id: string;
   username: string;
@@ -21,6 +20,10 @@ interface ChannelStats {
   streakEnd?: string | null;
   sentiment?: SentimentStats;
   firstMessageTimestamp?: string;
+}
+interface TopChannel {
+  name: string;
+  totalMessages: number;
 }
 
 interface ServerMapping {
@@ -60,6 +63,37 @@ interface DataContextType {
   clearData: () => void;
 }
 
+interface UserStats {
+  channelId: string;
+  userId?: string;
+  name: string;
+  avatar?: string;
+  count: number;
+}
+
+interface StreakStats {
+  channelId: string;
+  userId?: string;
+  name: string;
+  avatar?: string;
+  longestStreak: number;
+  streakStart: string;
+  streakEnd: string;
+}
+
+interface ServerStats {
+  serverId: string;
+  name: string;
+  totalMessages: number;
+}
+
+interface ChannelInfo {
+  channelId: string;
+  name: string;
+  totalMessages: number;
+  serverName: string;
+}
+
 export type {
   Self,
   SentimentStats,
@@ -68,4 +102,9 @@ export type {
   ProcessedData,
   ActivityStats,
   DataContextType,
+  TopChannel,
+  UserStats,
+  StreakStats,
+  ServerStats,
+  ChannelInfo,
 };

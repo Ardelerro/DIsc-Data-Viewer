@@ -1,12 +1,7 @@
 import { motion } from "framer-motion";
 import type { FC } from "react";
 import React from "react";
-
-interface StatProps {
-  icon: React.ReactNode;
-  label: string;
-  value: string | number;
-}
+import type { StatProps } from "../types/types";
 
 const Stat: FC<StatProps> = ({ icon, label, value }) => (
   <motion.div

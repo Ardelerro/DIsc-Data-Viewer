@@ -3,16 +3,7 @@ import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { useData } from "../context/DataContext";
 import React from "react";
-
-interface StreakStats {
-  channelId: string;
-  userId?: string;
-  name: string;
-  avatar?: string;
-  longestStreak: number;
-  streakStart: string;
-  streakEnd: string;
-}
+import type { StreakStats } from "../types/discord";
 
 const TopStreaks: FC<{ className?: string }> = ({ className = "" }) => {
   const { data } = useData();
