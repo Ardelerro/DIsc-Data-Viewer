@@ -57,6 +57,7 @@ const ServerSearch: FC = () => {
     const allData: ChannelStats[] = [];
     for (const channelId of channelsInServer) {
       const stats = data.channelStats[`channel_${channelId}`];
+      console.log("Channel stats for", channelId, ":", stats);
       if (stats) {
         allData.push({
           ...stats,
@@ -142,22 +143,35 @@ const ServerSearch: FC = () => {
 
   function getFirstTimestampFromChannels(): string | null {
     if (!data || !selectedServer) return null;
-
+    
     const channelsInServer = Object.entries(data.serverMapping.channelToServer)
       .filter(([_, sid]) => sid === selectedServer)
-      .map(([channelId]) => `channel_${channelId}`);
-
-    let oldestTimestamp: string | null = null;
-    for (const channelId of channelsInServer) {
-      const stats = data.channelStats[channelId];
-      if (stats && stats.firstMessageTimestamp) {
-        if (!oldestTimestamp || stats.firstMessageTimestamp < oldestTimestamp) {
-          oldestTimestamp = stats.firstMessageTimestamp;
-        }
-      }
-    }
-
-    return oldestTimestamp;
+      .map(([channelId]) => {
+        const statsKey = `channel_${channelId}`;
+        const stats = data.channelStats[statsKey];
+        console.log(`Channel ${channelId} (${statsKey}):`, {
+          exists: !!stats,
+          firstMessageTimestamp: stats?.firstMessageTimestamp,
+          recipientName: stats?.recipientName
+        });
+        return stats;
+      })
+      .filter(Boolean) as ChannelStats[];
+    
+    
+    const timestamps = channelsInServer
+      .map((c) => c.firstMessageTimestamp)
+      .filter((ts): ts is string => {
+        const isValid = Boolean(ts);
+        if (!isValid) console.log("Filtered out null/undefined timestamp");
+        return isValid;
+      });
+    
+    
+    const firstTimestamp = timestamps
+      .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())[0];
+    
+    return firstTimestamp;
   }
 
   return (

@@ -2,6 +2,7 @@ import type JSZip from "jszip";
 import Sentiment from "sentiment";
 import { getTopWords, STOP_WORDS } from "../utils/textUtils";
 import { calculateStreak } from "../utils/streakUtils";
+import type { ChannelStats } from "../types/discord";
 
 async function processChannels(zip: JSZip) {
   const sentiment = new Sentiment();
@@ -10,7 +11,7 @@ async function processChannels(zip: JSZip) {
 
   const channelMapping: Record<string, string> = {};
   const channelNaming: Record<string, string> = {};
-  const channelStats: Record<string, any> = {};
+  const channelStats: Record<string, ChannelStats> = {};
   const channelManifest: string[] = [];
 
   const globalWordFreq: Record<string, number> = {};
@@ -24,6 +25,7 @@ async function processChannels(zip: JSZip) {
     messageCount: 0,
     averageGapBetweenMessages: 0,
     topWords: [] as string[],
+    firstMessageTimestamp: null,
   };
 
   const channelFiles = zip.file(/^Messages\/c\d+\/channel\.json$/i);
@@ -68,6 +70,7 @@ async function processChannels(zip: JSZip) {
         numGaps: 0,
         messageCount: 0,
         averageGapBetweenMessages: 0,
+        firstMessageTimestamp: null,
       };
 
       const localWordFreq: Record<string, number> = {};
@@ -75,8 +78,12 @@ async function processChannels(zip: JSZip) {
       let prevMessageTime: number | null = null;
 
       messages.sort((a: any, b: any) => {
-        const tA = a.Timestamp ? new Date(a.Timestamp.replace(" ", "T")).getTime() : 0;
-        const tB = b.Timestamp ? new Date(b.Timestamp.replace(" ", "T")).getTime() : 0;
+        const tA = a.Timestamp
+          ? new Date(a.Timestamp.replace(" ", "T")).getTime()
+          : 0;
+        const tB = b.Timestamp
+          ? new Date(b.Timestamp.replace(" ", "T")).getTime()
+          : 0;
         return tA - tB;
       });
 
@@ -93,7 +100,8 @@ async function processChannels(zip: JSZip) {
         stats.hourly[hour] = (stats.hourly[hour] || 0) + 1;
         stats.monthly[month] = (stats.monthly[month] || 0) + 1;
         aggregateStats.hourly[hour] = (aggregateStats.hourly[hour] || 0) + 1;
-        aggregateStats.monthly[month] = (aggregateStats.monthly[month] || 0) + 1;
+        aggregateStats.monthly[month] =
+          (aggregateStats.monthly[month] || 0) + 1;
 
         stats.messageCount++;
         aggregateStats.messageCount++;
@@ -145,7 +153,15 @@ async function processChannels(zip: JSZip) {
       stats.streakStart = streak.start;
       stats.streakEnd = streak.end;
       stats.recipientName = channelData.name || `Channel ${channelData.id}`;
-      stats.firstMessageTimestamp = messages[0]?.Timestamp || null;
+      if (messages.length > 0) {
+        const first = messages[0];
+        const firstTs =
+          first.Timestamp || first.timestamp || first.date || null;
+        stats.firstMessageTimestamp = firstTs
+          ? new Date(firstTs.replace(" ", "T")).toISOString()
+          : null;
+          console.log(`Channel ${channelData.id} first message timestamp: ${stats.firstMessageTimestamp}`);
+      }
 
       channelStats[`channel_${channelData.id}`] = stats;
       channelManifest.push(`channel_${channelData.id}.json`);
@@ -165,7 +181,7 @@ async function processChannels(zip: JSZip) {
     const total = aggregateStats.hourlySentimentTotal[hour] || 0;
     aggregateStats.hourlySentimentAverage[hour] = count > 0 ? total / count : 0;
   }
-
+  console.log(channelStats);
   return {
     aggregateStats,
     channelStats,
