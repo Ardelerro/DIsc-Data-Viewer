@@ -66,7 +66,7 @@ const UserSearch: FC = () => {
     );
 
   function getFriendshipDurationMessage(
-    firstTimestamp?: string
+    firstTimestamp?: string | null
   ): string | null {
     if (!firstTimestamp) return null;
     const first = new Date(firstTimestamp);
