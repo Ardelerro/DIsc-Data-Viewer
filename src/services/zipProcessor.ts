@@ -20,13 +20,21 @@ async function processZipData(
   const userMapping = await extractUserMapping(zip);
 
   update(1);
-  const { channelMapping, channelNaming, channelManifest } =
-    await processChannels(zip);
+  const { 
+    channelMapping, 
+    channelNaming, 
+    channelManifest, 
+    channelStats: channelStatsFromChannels 
+  } = await processChannels(zip);
 
   update(1);
   const serverMapping = await processServers(zip);
 
-  const { aggregateStats, channelStats, dmManifest } = await processMessages(
+  const { 
+    aggregateStats, 
+    channelStats: channelStatsFromMessages, 
+    dmManifest 
+  } = await processMessages(
     zip,
     channelMapping,
     userMapping,
@@ -36,6 +44,26 @@ async function processZipData(
     }
   );
 
+  const mergedChannelStats: Record<string, any> = {};
+  
+  for (const key in channelStatsFromChannels) {
+    mergedChannelStats[key] = {
+      ...channelStatsFromChannels[key],
+      ...channelStatsFromMessages[key],
+      firstMessageTimestamp: channelStatsFromChannels[key].firstMessageTimestamp,
+      topWords: channelStatsFromChannels[key].topWords,
+      longestStreak: channelStatsFromChannels[key].longestStreak,
+      streakStart: channelStatsFromChannels[key].streakStart,
+      streakEnd: channelStatsFromChannels[key].streakEnd,
+    };
+  }
+  
+  for (const key in channelStatsFromMessages) {
+    if (!mergedChannelStats[key]) {
+      mergedChannelStats[key] = channelStatsFromMessages[key];
+    }
+  }
+
   return {
     self,
     userMapping,
@@ -44,7 +72,7 @@ async function processZipData(
     channelManifest,
     serverMapping,
     aggregateStats,
-    channelStats,
+    channelStats: mergedChannelStats,
     dmManifest,
     activityStats: {
       addReaction: 0,
