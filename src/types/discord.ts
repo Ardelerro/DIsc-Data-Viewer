@@ -19,7 +19,7 @@ interface ChannelStats {
   streakStart?: string | null;
   streakEnd?: string | null;
   sentiment?: SentimentStats;
-  firstMessageTimestamp?: string;
+  firstMessageTimestamp?: string | null;
 }
 interface TopChannel {
   name: string;
