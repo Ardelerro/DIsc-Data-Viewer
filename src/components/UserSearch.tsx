@@ -1,12 +1,12 @@
 import type { FC } from "react";
 import { useState, useMemo } from "react";
-import HourlyChart from "../components/HourlyChart";
-import MonthlyChart from "../components/MonthlyChart";
+import HourlyChart from "./charts/HourlyChart";
+import MonthlyChart from "./charts/MonthlyChart";
 import { motion } from "framer-motion";
 import { useData } from "../context/DataContext";
 import { User, MessageSquare, Clock, Calendar } from "lucide-react";
 import Stat from "./Stat";
-import SentimentBar from "./SentimentBar";
+import SentimentBar from "./charts/SentimentBar";
 import type { ChannelStats } from "../types/discord";
 
 const UserSearch: FC = () => {
@@ -122,17 +122,17 @@ const UserSearch: FC = () => {
           <label className="block mb-3 text-sm text-slate-700 dark:text-slate-300 font-medium">
             Select a user
           </label>
-        <motion.select
-          value={selectedUser ?? ""}
-          onChange={(e) => setSelectedUser(e.target.value || null)}
-          className="w-full px-4 py-3 rounded-xl bg-white/60 dark:bg-slate-700/50 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:outline-none transition-all"
-          whileFocus={{ scale: 1.02 }}
-        >
-          <option value="" disabled>
-            Choose a user
-          </option>
-          {userOptions}
-        </motion.select>
+          <motion.select
+            value={selectedUser ?? ""}
+            onChange={(e) => setSelectedUser(e.target.value || null)}
+            className="w-full px-4 py-3 rounded-xl bg-white/60 dark:bg-slate-700/50 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:outline-none transition-all"
+            whileFocus={{ scale: 1.02 }}
+          >
+            <option value="" disabled>
+              Choose a user
+            </option>
+            {userOptions}
+          </motion.select>
         </div>
 
         {channelData && (
@@ -154,7 +154,7 @@ const UserSearch: FC = () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
               <Stat
                 icon={<MessageSquare />}
                 label="Total Messages"

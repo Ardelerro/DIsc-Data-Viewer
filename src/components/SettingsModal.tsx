@@ -4,12 +4,9 @@ import type { SettingsModalProps } from "../types/types";
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
   showSettings,
-  theme,
   showElements,
   setShowSettings,
-  toggleTheme,
   setShowElements,
-  handleDownloadData,
 }) => {
   return (
     <AnimatePresence>
@@ -33,19 +30,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             </h2>
 
             <div className="space-y-4 mb-6">
-              <div className="flex justify-between items-center">
-                <span className="text-slate-700 dark:text-slate-300 font-medium">
-                  Dark Mode
-                </span>
-                <Switch.Root
-                  checked={theme === "dark"}
-                  onCheckedChange={toggleTheme}
-                  className="relative inline-flex h-6 w-11 cursor-pointer items-center rounded-full border border-transparent bg-slate-300 dark:bg-slate-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 data-[state=checked]:bg-indigo-600"
-                >
-                  <Switch.Thumb className="absolute top-1/2 left-[2px] block h-5 w-5 rounded-full bg-white shadow-md transition-transform duration-300 -translate-y-1/2 data-[state=checked]:translate-x-[22px]" />
-                </Switch.Root>
-              </div>
-
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <p className="text-slate-700 dark:text-slate-300 font-medium">
@@ -101,20 +85,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             </div>
 
-            <div className="flex justify-between mt-6">
-              <button
-                onClick={handleDownloadData}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium"
-              >
-                Download Data
-              </button>
-              <button
-                onClick={() => setShowSettings(false)}
-                className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-white"
-              >
-                Close
-              </button>
-            </div>
           </motion.div>
         </motion.div>
       )}
