@@ -15,12 +15,9 @@ interface StatProps {
 
 interface SettingsModalProps {
   showSettings: boolean;
-  theme: "light" | "dark";
   showElements: ShowElementsState;
   setShowSettings: (value: boolean) => void;
-  toggleTheme: () => void;
   setShowElements: React.Dispatch<React.SetStateAction<ShowElementsState>>;
-  handleDownloadData: () => void;
 }
 interface MonthlyChartProps {
     data: Record<string, number>;

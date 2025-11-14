@@ -1,7 +1,7 @@
 import type { FC } from "react";
 import { useState, useMemo } from "react";
-import HourlyChart from "../components/HourlyChart";
-import MonthlyChart from "../components/MonthlyChart";
+import HourlyChart from "./charts/HourlyChart";
+import MonthlyChart from "./charts/MonthlyChart";
 import { motion } from "framer-motion";
 import { useData } from "../context/DataContext";
 import { BookUser, MessageSquare, Clock, Calendar } from "lucide-react";
@@ -232,7 +232,7 @@ const ServerSearch: FC = () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
               <Stat
                 icon={<MessageSquare />}
                 label="Total Messages"
