@@ -14,6 +14,7 @@ interface ChannelStats {
   monthly: Record<string, number>;
   recipientName?: string;
   averageGapBetweenMessages?: number;
+  averageConversationTime?: number;
   topWords?: string[];
   longestStreak?: number;
   streakStart?: string | null;

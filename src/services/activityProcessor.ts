@@ -42,7 +42,7 @@ async function processActivities(
         resolve(data);
         worker.terminate();
         const endTime = performance.now();
-        console.log(`Activity processing took ${endTime - startTime} ms`);
+        //console.log(`Activity processing took ${endTime - startTime} ms`);
       }
     };
 

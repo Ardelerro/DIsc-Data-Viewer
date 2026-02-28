@@ -160,7 +160,7 @@ async function processChannels(zip: JSZip) {
         stats.firstMessageTimestamp = firstTs
           ? new Date(firstTs.replace(" ", "T")).toISOString()
           : null;
-          console.log(`Channel ${channelData.id} first message timestamp: ${stats.firstMessageTimestamp}`);
+          //console.log(`Channel ${channelData.id} first message timestamp: ${stats.firstMessageTimestamp}`);
       }
 
       channelStats[`channel_${channelData.id}`] = stats;
@@ -181,7 +181,7 @@ async function processChannels(zip: JSZip) {
     const total = aggregateStats.hourlySentimentTotal[hour] || 0;
     aggregateStats.hourlySentimentAverage[hour] = count > 0 ? total / count : 0;
   }
-  console.log(channelStats);
+  //console.log(channelStats);
   return {
     aggregateStats,
     channelStats,
