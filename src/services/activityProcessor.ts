@@ -7,7 +7,7 @@ async function processActivities(
   zipFile: File | Blob,
   onProgress?: (progress: number) => void
 ): Promise<ActivityStats> {
-  const startTime = performance.now(); 
+  //const startTime = performance.now(); 
   const zipReader = new ZipReader(new BlobReader(zipFile));
   const entries = await zipReader.getEntries();
   
@@ -41,7 +41,7 @@ async function processActivities(
       } else if (type === 'complete') {
         resolve(data);
         worker.terminate();
-        const endTime = performance.now();
+        //const endTime = performance.now();
         //console.log(`Activity processing took ${endTime - startTime} ms`);
       }
     };
