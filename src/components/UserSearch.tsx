@@ -22,7 +22,7 @@ const UserSearch: FC = () => {
       .map(([key, entry]) => {
         const total = Object.values(entry.hourly || {}).reduce(
           (sum, c) => sum + c,
-          0
+          0,
         );
         return { key, name: entry.recipientName, total };
       });
@@ -52,7 +52,23 @@ const UserSearch: FC = () => {
     if (!channelData) return 0;
     return Object.values(channelData.hourly).reduce((sum, c) => sum + c, 0);
   }, [channelData]);
+  const selectedUserAvatarUrl = useMemo(() => {
+    if (!data || !channelData?.recipientName) return null;
 
+    const entry = Object.entries(data.userMapping || {}).find(
+      ([, info]) => info.username === channelData.recipientName,
+    );
+
+    if (!entry) return null;
+
+    const [userId, info] = entry;
+
+    if (info.avatar) {
+      return `https://cdn.discordapp.com/avatars/${userId}/${info.avatar}.png?size=128`;
+    }
+
+    return `https://cdn.discordapp.com/embed/avatars/${Number(userId) % 5}.png`;
+  }, [data, channelData]);
   const userRank = useMemo(() => {
     const user = rankedUsers.find((u) => u.key === selectedUser);
     return user ? user.rank : null;
@@ -66,13 +82,13 @@ const UserSearch: FC = () => {
     );
 
   function getFriendshipDurationMessage(
-    firstTimestamp?: string | null
+    firstTimestamp?: string | null,
   ): string | null {
     if (!firstTimestamp) return null;
     const first = new Date(firstTimestamp);
     const now = new Date();
     const diffDays = Math.floor(
-      (now.getTime() - first.getTime()) / (1000 * 60 * 60 * 24)
+      (now.getTime() - first.getTime()) / (1000 * 60 * 60 * 24),
     );
 
     const years = Math.floor(diffDays / 365);
@@ -105,9 +121,18 @@ const UserSearch: FC = () => {
         className="p-6 rounded-2xl bg-white/80 dark:bg-slate-800/70 backdrop-blur-xl shadow-lg ring-1 ring-slate-200 dark:ring-slate-700"
       >
         <div className="flex items-center gap-3 mb-6">
-          <div className="p-3 bg-indigo-100 dark:bg-indigo-900/40 rounded-xl text-indigo-600 dark:text-indigo-400">
-            <User size={24} />
-          </div>
+              {selectedUserAvatarUrl ? (
+                <img
+                  src={selectedUserAvatarUrl}
+                  alt="User avatar"
+                  className="w-10 h-10 rounded-full"
+                />
+              ) : (
+                <User
+                  size={30}
+                  className="text-indigo-600 dark:text-indigo-400"
+                />
+              )}
           <div>
             <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
               Search Direct Messages
@@ -149,7 +174,7 @@ const UserSearch: FC = () => {
               <p className="text-sm text-slate-500 dark:text-slate-400">
                 Rank #{userRank} —{" "}
                 {getFriendshipDurationMessage(
-                  channelData.firstMessageTimestamp
+                  channelData.firstMessageTimestamp,
                 )}
               </p>
             </div>
@@ -163,8 +188,8 @@ const UserSearch: FC = () => {
               {channelData.averageGapBetweenMessages && (
                 <Stat
                   icon={<Clock />}
-                  label="Avg. Gap (min)"
-                  value={Math.round(channelData.averageGapBetweenMessages / 60)}
+                  label="Avg. Gap (min) | Avg. Conversation Time (min)"
+                  value={`${Math.round(channelData.averageGapBetweenMessages / 60)} | ${Math.round(channelData.averageConversationTime! / 60)}`}
                 />
               )}
               {channelData.firstMessageTimestamp && (
@@ -172,7 +197,7 @@ const UserSearch: FC = () => {
                   icon={<Calendar />}
                   label="First Message"
                   value={new Date(
-                    channelData.firstMessageTimestamp
+                    channelData.firstMessageTimestamp,
                   ).toLocaleDateString()}
                 />
               )}

@@ -16,22 +16,32 @@ import type { MonthlyChartProps } from "../../types/types";
 const MonthlyChart: FC<MonthlyChartProps> = ({ data, className = "" }) => {
   const chartData = useMemo(() => {
     const months = Object.keys(data).sort();
+    //console.log("months", months);
     if (months.length === 0) return [];
 
-    const first = new Date(`${months[0]}-01`);
-    const last = new Date(`${months[months.length - 1]}-01`);
+    const [startYear, startMonth] = months[0].split("-").map(Number);
+    const [endYear, endMonth] = months[months.length - 1]
+      .split("-")
+      .map(Number);
 
-    const result: { month: string; count: number; ts: number }[] = [];
-    const current = new Date(first);
+    const result: { month: string; count: number }[] = [];
 
-    while (current <= last) {
-      const monthStr = current.toISOString().slice(0, 7);
+    let year = startYear;
+    let month = startMonth;
+
+    while (year < endYear || (year === endYear && month <= endMonth)) {
+      const monthStr = `${year}-${String(month).padStart(2, "0")}`;
+
       result.push({
         month: monthStr,
         count: data[monthStr] ?? 0,
-        ts: current.getTime(),
       });
-      current.setMonth(current.getMonth() + 1);
+
+      month++;
+      if (month > 12) {
+        month = 1;
+        year++;
+      }
     }
 
     return result;

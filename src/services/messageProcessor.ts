@@ -8,11 +8,10 @@ async function processMessages(
   channelMapping: Record<string, string>,
   userMapping: Record<string, any>,
   yourId: string,
-  p0: (msgProgress: number) => void
+  p0: (msgProgress: number) => void,
 ) {
   const sentiment = new Sentiment();
   const MESSAGE_GAP_THRESHOLD = 30;
-  const MESSAGE_GAP_IGNORED = 259200;
 
   const aggregateStats = {
     hourly: {} as Record<string, number>,
@@ -22,6 +21,8 @@ async function processMessages(
     numGaps: 0,
     messageCount: 0,
     averageGapBetweenMessages: 0,
+    averageConversationTime: 0,
+    longestConversationTime: 0,
     hourlySentimentTotal: {} as Record<string, number>,
     hourlySentimentAverage: {} as Record<string, number>,
   };
@@ -53,8 +54,11 @@ async function processMessages(
           monthly: {},
           totalGapTime: 0,
           numGaps: 0,
+          totalConversationTime: 0,
+          longestConversationTime: 0,
           messageCount: 0,
           averageGapBetweenMessages: 0,
+          averageConversationTime: 0,
         };
 
         const localWordFreq: Record<string, number> = {};
@@ -70,10 +74,13 @@ async function processMessages(
             : 0;
           return tA - tB;
         });
-
+        let startTime: number | null = null;
         for (const msg of messages) {
           if (!msg.Timestamp) continue;
-
+          if (!startTime)
+            startTime = Math.floor(
+              new Date(msg.Timestamp.replace(" ", "T")).getTime() / 1000,
+            );
           const timestamp = new Date(msg.Timestamp.replace(" ", "T"));
           if (isNaN(timestamp.getTime())) continue;
 
@@ -92,15 +99,27 @@ async function processMessages(
           aggregateStats.messageCount++;
 
           const currentTime = Math.floor(timestamp.getTime() / 1000);
+
           if (prevMessageTime !== null) {
             const gap = currentTime - prevMessageTime;
-            if (gap > MESSAGE_GAP_THRESHOLD && gap < MESSAGE_GAP_IGNORED) {
-              stats.totalGapTime += gap;
+
+            if (gap > MESSAGE_GAP_THRESHOLD * 60) {
+              if (startTime !== null) {
+                stats.totalConversationTime += prevMessageTime - startTime;
+              }
+
+              stats.totalGapTime += gap - MESSAGE_GAP_THRESHOLD * 60;
               stats.numGaps++;
-              aggregateStats.totalGapTime += gap;
+
+              aggregateStats.totalGapTime += gap - MESSAGE_GAP_THRESHOLD * 60;
               aggregateStats.numGaps++;
+
+              startTime = currentTime;
             }
+          } else {
+            startTime = currentTime;
           }
+
           prevMessageTime = currentTime;
 
           messageDates.add(timestamp.toISOString().split("T")[0]);
@@ -134,15 +153,21 @@ async function processMessages(
             }
           }
         }
+        if (startTime !== null && prevMessageTime !== null) {
+          stats.totalConversationTime += prevMessageTime - startTime;
+        }
         if (stats.messageCount > 0 && stats.sentiment) {
           stats.sentiment.average /= stats.messageCount;
         }
         stats.averageGapBetweenMessages =
           stats.numGaps > 0 ? stats.totalGapTime / stats.numGaps : 0;
-
+        stats.averageConversationTime =
+          stats.messageCount > 0
+            ? stats.totalConversationTime / (stats.numGaps + 1)
+            : 0;
         if (channelType === "DM") {
           const channelFile = zip.file(
-            new RegExp(`^Messages/c${channelId}/channel\\.json$`, "i")
+            new RegExp(`^Messages/c${channelId}/channel\\.json$`, "i"),
           )?.[0];
           if (channelFile) {
             const channelData = JSON.parse(await channelFile.async("text"));
@@ -176,7 +201,7 @@ async function processMessages(
           }
         } else {
           const channelFile = zip.file(
-            new RegExp(`^Messages/c${channelId}/channel\\.json$`, "i")
+            new RegExp(`^Messages/c${channelId}/channel\\.json$`, "i"),
           )?.[0];
           if (channelFile) {
             const channelData = JSON.parse(await channelFile.async("text"));
@@ -199,16 +224,17 @@ async function processMessages(
       } catch (err) {
         console.warn(
           `Failed processing messages for file: ${messagesFile.name}`,
-          err
+          err,
         );
       }
-    })
+    }),
   );
 
   aggregateStats.averageGapBetweenMessages =
     aggregateStats.numGaps > 0
       ? aggregateStats.totalGapTime / aggregateStats.numGaps
       : 0;
+
   aggregateStats.topWords = getTopWords(globalWordFreq, 5);
   for (const hour in aggregateStats.hourly) {
     const count = aggregateStats.hourly[hour];
@@ -218,10 +244,9 @@ async function processMessages(
   return { aggregateStats, channelStats, dmManifest };
 }
 
-
 async function resolveUserName(
   zip: JSZip,
-  userId: string
+  userId: string,
 ): Promise<string | null> {
   const user = await searchUserInUsersJson(zip, userId);
   return user?.username || null;
@@ -229,7 +254,7 @@ async function resolveUserName(
 
 async function searchUserInUsersJson(
   zip: JSZip,
-  userId: string
+  userId: string,
 ): Promise<{ username: string; avatar: string } | null> {
   const usersFile = zip.file(/^Account\/users\.json$/i)?.[0];
   if (!usersFile) return null;
@@ -243,7 +268,7 @@ async function searchUserInUsersJson(
   }
 
   function recursiveSearch(
-    obj: any
+    obj: any,
   ): { username: string; avatar: string } | null {
     if (!obj || typeof obj !== "object") return null;
     if (obj.id === userId && obj.username) {
@@ -258,7 +283,5 @@ async function searchUserInUsersJson(
 
   return recursiveSearch(data);
 }
-
-
 
 export { processMessages };

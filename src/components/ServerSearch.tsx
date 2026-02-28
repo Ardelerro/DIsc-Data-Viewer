@@ -57,7 +57,7 @@ const ServerSearch: FC = () => {
     const allData: ChannelStats[] = [];
     for (const channelId of channelsInServer) {
       const stats = data.channelStats[`channel_${channelId}`];
-      console.log("Channel stats for", channelId, ":", stats);
+      //console.log("Channel stats for", channelId, ":", stats);
       if (stats) {
         allData.push({
           ...stats,
@@ -149,11 +149,11 @@ const ServerSearch: FC = () => {
       .map(([channelId]) => {
         const statsKey = `channel_${channelId}`;
         const stats = data.channelStats[statsKey];
-        console.log(`Channel ${channelId} (${statsKey}):`, {
+        /*console.log(`Channel ${channelId} (${statsKey}):`, {
           exists: !!stats,
           firstMessageTimestamp: stats?.firstMessageTimestamp,
           recipientName: stats?.recipientName
-        });
+        });*/
         return stats;
       })
       .filter(Boolean) as ChannelStats[];
@@ -163,7 +163,7 @@ const ServerSearch: FC = () => {
       .map((c) => c.firstMessageTimestamp)
       .filter((ts): ts is string => {
         const isValid = Boolean(ts);
-        if (!isValid) console.log("Filtered out null/undefined timestamp");
+        //if (!isValid) console.log("Filtered out null/undefined timestamp");
         return isValid;
       });
     
