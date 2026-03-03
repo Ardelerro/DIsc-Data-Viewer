@@ -25,21 +25,28 @@ const SettingsModal = <T extends Record<string, boolean>>({
   };
 
   return (
+
     <AnimatePresence>
       {showSettings && (
         <motion.div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
           onClick={() => setShowSettings(false)}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
         >
           <motion.div
             onClick={(e) => e.stopPropagation()}
             className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-md shadow-xl"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.8, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 260, damping: 20 }}
           >
             <h2 className="text-xl font-semibold mb-4 text-slate-900 dark:text-white">
               Settings
             </h2>
 
-            {/* Toggle All */}
             <div className="flex justify-between items-center mb-4">
               <span className="font-medium text-slate-700 dark:text-slate-200">
                 All
@@ -53,7 +60,6 @@ const SettingsModal = <T extends Record<string, boolean>>({
               </Switch.Root>
             </div>
 
-            {/* Individual Toggles */}
             <div className="space-y-3">
               {Object.entries(showElements).map(([key, value]) => (
                 <div key={key} className="flex justify-between items-center">
