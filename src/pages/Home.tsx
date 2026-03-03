@@ -35,6 +35,7 @@ const Home: FC = () => {
   const toggleTheme = useCallback(() => {
     setTheme((prev) => {
       const t = prev === "light" ? "dark" : "light";
+      localStorage.setItem("theme", t);
       if (t === "dark") document.documentElement.classList.add("dark");
       else document.documentElement.classList.remove("dark");
       return t;
