@@ -1,37 +1,28 @@
 import type JSZip from "jszip";
 
-
 async function processServers(zip: JSZip) {
-  const serverMapping = {
-    channelToServer: {} as Record<string, string>,
-    serverNames: {} as Record<string, string>,
-  };
+  const channelToServer: Record<string, string> = {};
+  const serverNames: Record<string, string> = {};
 
   const channelFiles = zip.file(/^Messages\/c\d+\/channel\.json$/i);
 
-  for (const channelFile of channelFiles) {
+  await Promise.all(channelFiles.map(async (channelFile) => {
     try {
       const content = await channelFile.async("text");
       const channelData = JSON.parse(content);
-      if (channelData.type === "GROUP_DM" || channelData.type === "DM")
-        continue;
-
-      if (channelData.guild && channelData.guild.id && channelData.guild.name) {
-        const guildId = channelData.guild.id;
-        const guildName = channelData.guild.name.trim();
-
-        if (!guildId || !guildName) continue;
-        if (guildName.toLowerCase() !== "unknown") {
-          serverMapping.channelToServer[channelData.id] = guildId;
-          serverMapping.serverNames[guildId] = guildName;
-        }
-      }
+      if (channelData.type === "GROUP_DM" || channelData.type === "DM") return;
+      const guild = channelData.guild;
+      if (!guild?.id || !guild?.name) return;
+      const name = guild.name.trim();
+      if (!name || name.toLowerCase() === "unknown") return;
+      channelToServer[channelData.id] = guild.id;
+      serverNames[guild.id] = name;
     } catch (err) {
-      console.warn(`Failed to process server data:`, err);
+      console.warn("Failed to process server data:", err);
     }
-  }
+  }));
 
-  return serverMapping;
+  return { channelToServer, serverNames };
 }
 
 export { processServers };

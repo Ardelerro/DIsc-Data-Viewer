@@ -184,7 +184,7 @@ const UserSearch: FC = () => {
               onClick={() => setShowSettings(true)}
               className="cursor-pointer"
             >
-              <Settings className="w-6 h-6 stroke-indigo-500 hover:stroke-indigo-600 dark:stroke-indigo-300 dark:hover:stroke-indigo-200 transition-colors" />
+              {selectedUser && <Settings className="w-6 h-6 stroke-indigo-500 hover:stroke-indigo-600 dark:stroke-indigo-300 dark:hover:stroke-indigo-200 transition-colors" />}
             </div>
             <select
               value={rankingType}

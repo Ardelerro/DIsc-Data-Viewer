@@ -13,6 +13,7 @@ import HourlyMoodChart from "../components/charts/HourlyMoodChart";
 import SettingsModal from "../components/SettingsModal";
 import type { ShowElementsState } from "../types/types";
 import MonthlyChart from "../components/charts/MonthlyChart";
+import { createPortal } from "react-dom";
 import { Settings, Trash2, Download, Sun, Moon, MenuIcon } from "lucide-react";
 
 const Home: FC = () => {
@@ -199,15 +200,15 @@ const Home: FC = () => {
         </div>
       </div>
 
-      <motion.div
+      {createPortal(<motion.div
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ type: "spring", stiffness: 45, damping: 14 }}
         className={`
-    fixed bottom-3 sm:hidden
-    ${fabOnLeft ? "left-1/2 -translate-x-1/2" : "left-0 -translate-x-7"}
-    flex items-center gap-3 z-50
-  `}
+          fixed bottom-3 sm:hidden
+          ${fabOnLeft ? "left-1/2 -translate-x-1/2" : "left-0 -translate-x-7"}
+          flex items-center gap-3 z-50
+        `}
       >
         <motion.div
           initial={false}
@@ -305,54 +306,56 @@ const Home: FC = () => {
         >
           <MenuIcon className="w-6 h-6 stroke-slate-700 dark:stroke-slate-300" />
         </motion.div>
-      </motion.div>
-
+      </motion.div>, document.body
+)}
       <SettingsModal
         showSettings={showSettings}
         showElements={showElements}
         setShowSettings={setShowSettings}
         setShowElements={setShowElements}
       />
-      {showConfirmDelete && (
-        <motion.div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
+      {showConfirmDelete &&
+        createPortal(
           <motion.div
-            className="bg-white dark:bg-slate-800 rounded-xl p-6 w-80 max-w-sm shadow-xl flex flex-col gap-4"
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.8, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 260, damping: 20 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
           >
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-              Are you sure?
-            </h3>
-            <p className="text-sm text-slate-700 dark:text-slate-300">
-              This will delete all your data and cannot be undone.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowConfirmDelete(false)}
-                className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  clearData();
-                  setShowConfirmDelete(false);
-                }}
-                className="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white transition"
-              >
-                Delete
-              </button>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
+            <motion.div
+              className="bg-white dark:bg-slate-800 rounded-xl p-6 w-80 max-w-sm shadow-xl flex flex-col gap-4"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 260, damping: 20 }}
+            >
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                Are you sure?
+              </h3>
+              <p className="text-sm text-slate-700 dark:text-slate-300">
+                This will delete all your data and cannot be undone.
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setShowConfirmDelete(false)}
+                  className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    clearData();
+                    setShowConfirmDelete(false);
+                  }}
+                  className="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white transition"
+                >
+                  Delete
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>,
+          document.body,
+        )}
     </div>
   );
 };

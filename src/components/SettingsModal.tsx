@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import * as Switch from "@radix-ui/react-switch";
 import type { SettingsModalProps } from "../types/types";
+import { createPortal } from "react-dom";
 
 const SettingsModal = <T extends Record<string, boolean>>({
   showSettings,
@@ -24,12 +25,13 @@ const SettingsModal = <T extends Record<string, boolean>>({
     }));
   };
 
-  return (
+  if (typeof document === "undefined") return null;
 
+  return createPortal(
     <AnimatePresence>
       {showSettings && (
         <motion.div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]"
           onClick={() => setShowSettings(false)}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -51,6 +53,7 @@ const SettingsModal = <T extends Record<string, boolean>>({
               <span className="font-medium text-slate-700 dark:text-slate-200">
                 All
               </span>
+
               <Switch.Root
                 checked={allEnabled}
                 onCheckedChange={toggleAll}
@@ -80,7 +83,8 @@ const SettingsModal = <T extends Record<string, boolean>>({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
 
