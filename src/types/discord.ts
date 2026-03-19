@@ -39,10 +39,23 @@ interface ProcessedData {
   channelNaming: Record<string, string>;
   channelManifest: string[];
   serverMapping: ServerMapping;
-  aggregateStats: any;
+  aggregateStats: AggregateStats;
   channelStats: Record<string, ChannelStats>;
   dmManifest: string[];
   activityStats: ActivityStats;
+}
+interface AggregateStats {
+  hourly: Record<string, number>;
+  monthly: Record<string, number>;
+  topWords: string[];
+  totalGapTime: number;
+  numGaps: number;
+  messageCount: number;
+  averageGapBetweenMessages: number;
+  averageConversationTime?: number;
+  longestConversationTime?: number;
+  hourlySentimentTotal: Record<string, number>;
+  hourlySentimentAverage: Record<string, number>;
 }
 interface ActivityStats {
   addReaction: number;
@@ -108,4 +121,5 @@ export type {
   StreakStats,
   ServerStats,
   ChannelInfo,
+  AggregateStats
 };

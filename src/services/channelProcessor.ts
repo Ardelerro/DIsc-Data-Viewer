@@ -3,6 +3,7 @@ import Sentiment from "sentiment";
 import { getTopWords, STOP_WORDS } from "../utils/textUtils";
 import { calculateStreak } from "../utils/streakUtils";
 import type { ChannelStats } from "../types/discord";
+import type { AggregateStats } from "../types/discord";
 
 async function processChannels(zip: JSZip) {
   const sentiment = new Sentiment();
@@ -15,6 +16,7 @@ async function processChannels(zip: JSZip) {
   const channelManifest: string[] = [];
   const globalWordFreq: Record<string, number> = {};
 
+  /*
   const aggregateStats = {
     hourly: {} as Record<string, number>,
     monthly: {} as Record<string, number>,
@@ -27,7 +29,20 @@ async function processChannels(zip: JSZip) {
     topWords: [] as string[],
     firstMessageTimestamp: null as string | null,
   };
-
+  */
+  const aggregateStats: AggregateStats = {
+    hourly: {},
+    monthly: {},
+    topWords: [],
+    totalGapTime: 0,
+    numGaps: 0,
+    messageCount: 0,
+    averageGapBetweenMessages: 0,
+    averageConversationTime: 0,
+    longestConversationTime: 0,
+    hourlySentimentTotal: {},
+    hourlySentimentAverage: {},
+  };
   const channelFiles = zip.file(/^Messages\/c\d+\/channel\.json$/i);
 
   // Phase 1: read all channel.json files in parallel (small files, safe)
@@ -39,13 +54,18 @@ async function processChannels(zip: JSZip) {
       } catch {
         return null;
       }
-    })
+    }),
   );
 
   for (const channelData of channelDataList) {
     if (!channelData?.id) continue;
 
-    let type: "DM" | "GROUP_DM" | "GUILD_TEXT" | "GUILD_VOICE" | "PUBLIC_THREAD" = "GUILD_TEXT";
+    let type:
+      | "DM"
+      | "GROUP_DM"
+      | "GUILD_TEXT"
+      | "GUILD_VOICE"
+      | "PUBLIC_THREAD" = "GUILD_TEXT";
     if (channelData.type === "DM") type = "DM";
     else if (channelData.type === "GROUP_DM") type = "GROUP_DM";
     else if (channelData.type === 13) type = "PUBLIC_THREAD";
@@ -57,13 +77,16 @@ async function processChannels(zip: JSZip) {
 
   // Phase 2: process only GUILD_TEXT / PUBLIC_THREAD message files sequentially (memory safety)
   const relevantChannels = channelDataList.filter(
-    (d) => d?.id && (channelMapping[d.id] === "GUILD_TEXT" || channelMapping[d.id] === "PUBLIC_THREAD")
+    (d) =>
+      d?.id &&
+      (channelMapping[d.id] === "GUILD_TEXT" ||
+        channelMapping[d.id] === "PUBLIC_THREAD"),
   );
 
   for (const channelData of relevantChannels) {
     try {
       const messageFile = zip.file(
-        new RegExp(`^Messages/c${channelData.id}/messages\\.json$`, "i")
+        new RegExp(`^Messages/c${channelData.id}/messages\\.json$`, "i"),
       )?.[0];
       if (!messageFile) continue;
 
@@ -86,8 +109,12 @@ async function processChannels(zip: JSZip) {
       let prevMessageTime: number | null = null;
 
       messages.sort((a, b) => {
-        const tA = a.Timestamp ? new Date(a.Timestamp.replace(" ", "T")).getTime() : 0;
-        const tB = b.Timestamp ? new Date(b.Timestamp.replace(" ", "T")).getTime() : 0;
+        const tA = a.Timestamp
+          ? new Date(a.Timestamp.replace(" ", "T")).getTime()
+          : 0;
+        const tB = b.Timestamp
+          ? new Date(b.Timestamp.replace(" ", "T")).getTime()
+          : 0;
         return tA - tB;
       });
 
@@ -102,7 +129,8 @@ async function processChannels(zip: JSZip) {
         stats.hourly[hour] = (stats.hourly[hour] || 0) + 1;
         stats.monthly[month] = (stats.monthly[month] || 0) + 1;
         aggregateStats.hourly[hour] = (aggregateStats.hourly[hour] || 0) + 1;
-        aggregateStats.monthly[month] = (aggregateStats.monthly[month] || 0) + 1;
+        aggregateStats.monthly[month] =
+          (aggregateStats.monthly[month] || 0) + 1;
         stats.messageCount++;
         aggregateStats.messageCount++;
 
@@ -141,7 +169,8 @@ async function processChannels(zip: JSZip) {
       }
 
       if (stats.messageCount > 0) stats.sentiment.average /= stats.messageCount;
-      stats.averageGapBetweenMessages = stats.numGaps > 0 ? stats.totalGapTime / stats.numGaps : 0;
+      stats.averageGapBetweenMessages =
+        stats.numGaps > 0 ? stats.totalGapTime / stats.numGaps : 0;
       stats.topWords = getTopWords(localWordFreq, 5);
       const streak = calculateStreak(messageDates);
       stats.longestStreak = streak.length;
@@ -164,7 +193,9 @@ async function processChannels(zip: JSZip) {
   }
 
   aggregateStats.averageGapBetweenMessages =
-    aggregateStats.numGaps > 0 ? aggregateStats.totalGapTime / aggregateStats.numGaps : 0;
+    aggregateStats.numGaps > 0
+      ? aggregateStats.totalGapTime / aggregateStats.numGaps
+      : 0;
   aggregateStats.topWords = getTopWords(globalWordFreq, 5);
 
   for (const hour in aggregateStats.hourly) {
@@ -173,7 +204,13 @@ async function processChannels(zip: JSZip) {
     aggregateStats.hourlySentimentAverage[hour] = count > 0 ? total / count : 0;
   }
 
-  return { aggregateStats, channelStats, channelMapping, channelNaming, channelManifest };
+  return {
+    aggregateStats,
+    channelStats,
+    channelMapping,
+    channelNaming,
+    channelManifest,
+  };
 }
 
 export { processChannels };

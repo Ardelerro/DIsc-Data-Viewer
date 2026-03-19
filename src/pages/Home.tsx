@@ -189,13 +189,13 @@ const Home: FC = () => {
           )}
           {showElements.hourlyCharts && (
             <HourlyChart
-              data={memoizedHourly}
+              data={memoizedHourly!}
               className="col-span-1 lg:col-span-2"
             />
           )}
           {showElements.monthlyCharts && (
             <MonthlyChart
-              data={memoizedMonthly}
+              data={memoizedMonthly!}
               className="col-span-1 lg:col-span-2"
             />
           )}
