@@ -2,6 +2,8 @@ import type JSZip from "jszip";
 import { calculateStreak } from "../utils/streakUtils";
 import { getTopWords, STOP_WORDS } from "../utils/textUtils";
 import Sentiment from "sentiment";
+import type { AggregateStats } from "../types/discord";
+import type { ChannelStats } from "../types/discord";
 
 async function processMessages(
   zip: JSZip,
@@ -13,6 +15,7 @@ async function processMessages(
   const sentiment = new Sentiment();
   const MESSAGE_GAP_THRESHOLD_S = 30 * 60; // pre-multiply once
 
+  /*
   const aggregateStats = {
     hourly: {} as Record<string, number>,
     monthly: {} as Record<string, number>,
@@ -26,8 +29,21 @@ async function processMessages(
     hourlySentimentTotal: {} as Record<string, number>,
     hourlySentimentAverage: {} as Record<string, number>,
   };
-
-  const channelStats: Record<string, any> = {};
+  */
+  const aggregateStats: AggregateStats = {
+    hourly: {},
+    monthly: {},
+    topWords: [],
+    totalGapTime: 0,
+    numGaps: 0,
+    messageCount: 0,
+    averageGapBetweenMessages: 0,
+    averageConversationTime: 0,
+    longestConversationTime: 0,
+    hourlySentimentTotal: {},
+    hourlySentimentAverage: {},
+  };
+  const channelStats: Record<string, ChannelStats> = {};
   const dmManifest: string[] = [];
   const globalWordFreq: Record<string, number> = {};
   const deletedUserCountMap: Record<string, number> = {};
