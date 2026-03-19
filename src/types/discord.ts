@@ -108,6 +108,37 @@ interface ChannelInfo {
   serverName: string;
 }
 
+interface WrappedCardData {
+  self: {
+    id: string;
+    username: string;
+    avatar_hash?: string;
+  };
+  aggregateStats: {
+    messageCount: number;
+    hourly?: Record<string, number>;
+    monthly?: Record<string, number>;
+  };
+  channelStats: Record<
+    string,
+    {
+      monthly?: Record<string, number>;
+      hourly?: Record<string, number>;
+      name?: string;
+    }
+  >;
+  activityStats: {
+    attachmentsSent: number;
+    addReaction: number;
+    joinVoice: number;
+    joinCall: number;
+    startCall: number;
+    appOpened: number;
+  };
+  topUsers: Array<{ username: string; messageCount: number }>;
+  serverStats: Record<string, { name?: string; messageCount: number }>;
+}
+
 export type {
   Self,
   SentimentStats,
@@ -121,5 +152,6 @@ export type {
   StreakStats,
   ServerStats,
   ChannelInfo,
-  AggregateStats
+  AggregateStats,
+  WrappedCardData
 };
