@@ -2,6 +2,7 @@ import type { FC } from "react";
 import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { useData } from "../context/DataContext";
+import { Navigate } from "react-router-dom";
 
 const UploadPage: FC = () => {
   const { uploadData, isLoading } = useData();
@@ -73,7 +74,7 @@ const UploadPage: FC = () => {
       setProgress(100);
       setEta(0);
 
-      setTimeout(() => window.location.replace("/"), 500);
+      setTimeout(() => <Navigate to="/" /> , 500);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to process file");
       setProgress(0);

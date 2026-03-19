@@ -30,4 +30,11 @@ interface HourlyChartProps {
     title?: string;
 }
 
-export { ShowElementsState, StatProps, SettingsModalProps, MonthlyChartProps, HourlyChartProps };
+type WrappedSlide = {
+  id: string;
+  priority: number;
+  enabled: boolean;
+  render: () => HTMLElement | null;
+};
+
+export { ShowElementsState, StatProps, SettingsModalProps, MonthlyChartProps, HourlyChartProps, WrappedSlide };
