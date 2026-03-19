@@ -4,28 +4,62 @@ import HourlyChart from "./charts/HourlyChart";
 import MonthlyChart from "./charts/MonthlyChart";
 import { motion } from "framer-motion";
 import { useData } from "../context/DataContext";
-import { User, MessageSquare, Clock, Calendar } from "lucide-react";
+import { User, MessageSquare, Clock, Calendar, Settings } from "lucide-react";
 import Stat from "./Stat";
 import SentimentBar from "./charts/SentimentBar";
 import type { ChannelStats } from "../types/discord";
+import SettingsModal from "./SettingsModal";
 
 const UserSearch: FC = () => {
   const { data } = useData();
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
+  const [rankingType, setRankingType] = useState<"messages" | "sentiment">(
+    "messages",
+  );
 
+  const [minMessages, setMinMessages] = useState<number>(100);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showElements, setShowElements] = useState({
+    hourly: true,
+    monthly: true,
+    sentiment: true,
+  });
   const rankedUsers = useMemo(() => {
     if (!data) return [];
 
-    const users = Object.entries(data.channelStats)
-      .filter(([key]) => key.startsWith("dm_"))
-      .filter(([_, entry]) => entry.recipientName)
-      .map(([key, entry]) => {
-        const total = Object.values(entry.hourly || {}).reduce(
-          (sum, c) => sum + c,
-          0,
-        );
-        return { key, name: entry.recipientName, total };
-      });
+    let users: { key: string; name: string | undefined; total: number }[] = [];
+
+    if (rankingType === "messages") {
+      users = Object.entries(data.channelStats)
+        .filter(([key]) => key.startsWith("dm_"))
+        .filter(([_, entry]) => entry.recipientName)
+        .map(([key, entry]) => {
+          const total = Object.values(entry.hourly || {}).reduce(
+            (sum, c) => sum + c,
+            0,
+          );
+          return { key, name: entry.recipientName, total };
+        });
+    } else {
+      users = Object.entries(data.channelStats)
+        .filter(([key]) => key.startsWith("dm_"))
+        .filter(([_, entry]) => entry.recipientName)
+        .map(([key, entry]) => {
+          const messageCount = Object.values(entry.hourly || {}).reduce(
+            (sum, c) => sum + c,
+            0,
+          );
+
+          return {
+            key,
+            name: entry.recipientName,
+            total: entry.sentiment?.average ?? 0,
+            messageCount,
+          };
+        })
+        .filter((user) => user.messageCount >= minMessages)
+        .map(({ key, name, total }) => ({ key, name, total }));
+    }
 
     users.sort((a, b) => b.total - a.total);
 
@@ -33,7 +67,7 @@ const UserSearch: FC = () => {
       ...user,
       rank: index + 1,
     }));
-  }, [data]);
+  }, [data, rankingType, minMessages]);
 
   const userOptions = useMemo(() => {
     return rankedUsers.map(({ key, name, rank }) => (
@@ -113,6 +147,7 @@ const UserSearch: FC = () => {
   }
 
   return (
+    <>
     <div className="max-w-5xl mx-auto px-4">
       <motion.div
         initial={{ opacity: 0, y: 10 }}
@@ -120,26 +155,58 @@ const UserSearch: FC = () => {
         transition={{ duration: 0.4 }}
         className="p-6 rounded-2xl bg-white/80 dark:bg-slate-800/70 backdrop-blur-xl shadow-lg ring-1 ring-slate-200 dark:ring-slate-700"
       >
-        <div className="flex items-center gap-3 mb-6">
-              {selectedUserAvatarUrl ? (
-                <img
-                  src={selectedUserAvatarUrl}
-                  alt="User avatar"
-                  className="w-10 h-10 rounded-full"
-                />
-              ) : (
-                <User
-                  size={30}
-                  className="text-indigo-600 dark:text-indigo-400"
-                />
-              )}
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-              Search Direct Messages
-            </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Explore your message history by user
-            </p>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            {selectedUserAvatarUrl ? (
+              <img
+                src={selectedUserAvatarUrl}
+                alt="User avatar"
+                className="w-10 h-10 rounded-full"
+              />
+            ) : (
+              <User
+                size={30}
+                className="text-indigo-600 dark:text-indigo-400"
+              />
+            )}
+            <div>
+              <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+                Search Direct Messages
+              </h1>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Explore your message history by user
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div
+              onClick={() => setShowSettings(true)}
+              className="cursor-pointer"
+            >
+              {selectedUser && <Settings className="w-6 h-6 stroke-indigo-500 hover:stroke-indigo-600 dark:stroke-indigo-300 dark:hover:stroke-indigo-200 transition-colors" />}
+            </div>
+            <select
+              value={rankingType}
+              onChange={(e) =>
+                setRankingType(e.target.value as "messages" | "sentiment")
+              }
+              className="px-3 py-2 rounded-lg text-sm bg-white/60 dark:bg-slate-700/50 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white"
+            >
+              <option value="messages">Rank by Messages</option>
+              <option value="sentiment">Rank by Avg Sentiment</option>
+            </select>
+
+            {rankingType === "sentiment" && (
+              <input
+                type="number"
+                value={minMessages}
+                min={0}
+                onChange={(e) => setMinMessages(Number(e.target.value))}
+                className="w-24 px-3 py-2 rounded-lg text-sm bg-white/60 dark:bg-slate-700/50 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white"
+                placeholder="Min msgs"
+              />
+            )}
           </div>
         </div>
 
@@ -203,7 +270,7 @@ const UserSearch: FC = () => {
               )}
             </div>
 
-            {channelData.sentiment && (
+            {channelData.sentiment &&  showElements.sentiment && (
               <div>
                 <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-3">
                   Sentiment Overview
@@ -213,12 +280,20 @@ const UserSearch: FC = () => {
               </div>
             )}
 
-            <HourlyChart data={channelData.hourly} />
-            <MonthlyChart data={channelData.monthly} />
+            {showElements.hourly && <HourlyChart data={channelData.hourly} />}
+            {showElements.monthly && <MonthlyChart data={channelData.monthly} />}
           </motion.div>
         )}
       </motion.div>
+
     </div>
+          <SettingsModal
+        showSettings={showSettings}
+        showElements={showElements}
+        setShowSettings={setShowSettings}
+        setShowElements={setShowElements}
+      />
+      </>
   );
 };
 

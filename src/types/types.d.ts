@@ -13,11 +13,11 @@ interface StatProps {
   value: string | number;
 }
 
-interface SettingsModalProps {
+interface SettingsModalProps<T extends Record<string, boolean>> {
   showSettings: boolean;
-  showElements: ShowElementsState;
+  showElements: T;
   setShowSettings: (value: boolean) => void;
-  setShowElements: React.Dispatch<React.SetStateAction<ShowElementsState>>;
+  setShowElements: React.Dispatch<React.SetStateAction<T>>;
 }
 interface MonthlyChartProps {
     data: Record<string, number>;
