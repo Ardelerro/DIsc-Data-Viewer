@@ -68,8 +68,19 @@ const SelfDisplay: FC = () => {
       : 1;
 
   const avgPerDay = (totalMessages / daysActive).toFixed(1);
+
+  const usersWithMessages = Object.entries(channelStats)
+    .filter(([key]) => key.startsWith("dm_"))
+    .filter(([_, stats]) => {
+      const total = Object.values(stats.hourly || {}).reduce(
+        (sum, c) => sum + c,
+        0
+      );
+      return total > 0;
+    }).length;
+
   const avgPerPerson = (
-    totalMessages / Object.keys(data.userMapping || {}).length
+    totalMessages / (usersWithMessages || 1)
   ).toFixed(1);
 
   const activity = data.activityStats;

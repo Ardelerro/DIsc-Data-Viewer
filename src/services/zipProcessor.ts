@@ -7,7 +7,7 @@ import { processServers } from "./processServer";
 
 async function processZipData(
   zip: JSZip,
-  onProgress?: (progress: number) => void
+  onProgress?: (progress: number) => void,
 ): Promise<ProcessedData> {
   let stageProgress = 0;
   const update = (inc: number) => {
@@ -15,25 +15,27 @@ async function processZipData(
     onProgress?.(stageProgress);
   };
 
-  const self = await extractSelfData(zip);
-
-  const userMapping = await extractUserMapping(zip);
-
+  const [self, userMapping] = await Promise.all([
+    extractSelfData(zip),
+    extractUserMapping(zip),
+  ]);
   update(1);
-  const { 
-    channelMapping, 
-    channelNaming, 
-    channelManifest, 
-    channelStats: channelStatsFromChannels 
-  } = await processChannels(zip);
 
+  const [
+    {
+      channelMapping,
+      channelNaming,
+      channelManifest,
+      channelStats: channelStatsFromChannels,
+    },
+    serverMapping,
+  ] = await Promise.all([processChannels(zip), processServers(zip)]);
   update(1);
-  const serverMapping = await processServers(zip);
 
-  const { 
-    aggregateStats, 
-    channelStats: channelStatsFromMessages, 
-    dmManifest 
+  const {
+    aggregateStats,
+    channelStats: channelStatsFromMessages,
+    dmManifest,
   } = await processMessages(
     zip,
     channelMapping,
@@ -41,23 +43,24 @@ async function processZipData(
     self.id,
     (msgProgress: number) => {
       update(map(msgProgress, 0, 100, 8, 100));
-    }
+    },
   );
 
   const mergedChannelStats: Record<string, any> = {};
-  
+
   for (const key in channelStatsFromChannels) {
     mergedChannelStats[key] = {
       ...channelStatsFromChannels[key],
       ...channelStatsFromMessages[key],
-      firstMessageTimestamp: channelStatsFromChannels[key].firstMessageTimestamp,
+      firstMessageTimestamp:
+        channelStatsFromChannels[key].firstMessageTimestamp,
       topWords: channelStatsFromChannels[key].topWords,
       longestStreak: channelStatsFromChannels[key].longestStreak,
       streakStart: channelStatsFromChannels[key].streakStart,
       streakEnd: channelStatsFromChannels[key].streakEnd,
     };
   }
-  
+
   for (const key in channelStatsFromMessages) {
     if (!mergedChannelStats[key]) {
       mergedChannelStats[key] = channelStatsFromMessages[key];
@@ -130,7 +133,7 @@ async function extractUserMapping(zip: JSZip) {
 
 function mergeUsers(
   mapping: Record<string, { username: string; avatar: string }>,
-  users: any
+  users: any,
 ) {
   function recurse(obj: any) {
     if (!obj || typeof obj !== "object") return;
