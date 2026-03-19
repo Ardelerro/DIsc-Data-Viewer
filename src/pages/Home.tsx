@@ -37,8 +37,14 @@ const Home: FC = () => {
     setTheme((prev) => {
       const t = prev === "light" ? "dark" : "light";
       localStorage.setItem("theme", t);
-      if (t === "dark") document.documentElement.classList.add("dark");
-      else document.documentElement.classList.remove("dark");
+      if (t === "dark") {
+        document.documentElement.classList.add("dark");
+        setTheme("dark");
+      }
+      else {
+        document.documentElement.classList.remove("dark");
+        setTheme("light");
+      }
       return t;
     });
   }, []);
