@@ -116,8 +116,9 @@ interface WrappedCardData {
   };
   aggregateStats: {
     messageCount: number;
-    hourly?: Record<string, number>;
-    monthly?: Record<string, number>;
+    hourly: Record<string, number>;
+    monthly: Record<string, number>;
+    topWords: string[];
   };
   channelStats: Record<
     string,

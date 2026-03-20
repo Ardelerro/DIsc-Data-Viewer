@@ -52,7 +52,6 @@ async function processMessages(
   const totalFiles = messageFiles.length;
   let processedFiles = 0;
 
-  // Sequential — avoids parallel decompression memory spikes
   for (const messagesFile of messageFiles) {
     p0(((++processedFiles / totalFiles) * 100) | 0);
 
@@ -158,10 +157,9 @@ async function processMessages(
           ? stats.totalConversationTime / (stats.numGaps + 1)
           : 0;
 
-      const topWords = getTopWords(localWordFreq, 5);
+      const topWords = getTopWords(localWordFreq, 50);
       const streak = calculateStreak(messageDates);
 
-      // Read channel.json once, handle both DM and non-DM
       const channelFile = zip.file(
         new RegExp(`^Messages/c${channelId}/channel\\.json$`, "i"),
       )?.[0];
@@ -178,7 +176,6 @@ async function processMessages(
         const recipientId =
           channelData.recipients?.find((r: string) => r !== yourId) ?? "unknown";
 
-        // Uses pre-built userMapping — no per-DM users.json re-reads
         let recipientName =
           userMapping[recipientId]?.username ?? `Unknown (${recipientId})`;
 
@@ -209,7 +206,7 @@ async function processMessages(
     aggregateStats.numGaps > 0
       ? aggregateStats.totalGapTime / aggregateStats.numGaps
       : 0;
-  aggregateStats.topWords = getTopWords(globalWordFreq, 5);
+  aggregateStats.topWords = getTopWords(globalWordFreq, 50);
 
   for (const hour in aggregateStats.hourly) {
     const count = aggregateStats.hourly[hour];
