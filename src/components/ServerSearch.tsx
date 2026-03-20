@@ -7,6 +7,7 @@ import { useData } from "../context/DataContext";
 import { BookUser, MessageSquare, Clock, Calendar } from "lucide-react";
 import Stat from "./Stat";
 import type { ChannelStats, TopChannel } from "../types/discord";
+import StaggeredStatGrid from "./StaggeredStatGrid";
 
 const ServerSearch: FC = () => {
   const { data } = useData();
@@ -180,6 +181,7 @@ const ServerSearch: FC = () => {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
+        key={selectedServer}
         className="p-6 rounded-2xl bg-white/80 dark:bg-slate-800/70 backdrop-blur-xl shadow-lg ring-1 ring-slate-200 dark:ring-slate-700"
       >
         <div className="flex items-center gap-3 mb-6">
@@ -232,7 +234,7 @@ const ServerSearch: FC = () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+            <StaggeredStatGrid className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
               <Stat
                 icon={<MessageSquare />}
                 label="Total Messages"
@@ -250,7 +252,7 @@ const ServerSearch: FC = () => {
                   value={Object.keys(aggregateData.monthly).length.toString()}
                 />
               )}
-            </div>
+            </StaggeredStatGrid>
 
             <HourlyChart data={aggregateData.hourly} />
             <MonthlyChart data={aggregateData.monthly} />

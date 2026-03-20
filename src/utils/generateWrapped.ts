@@ -481,7 +481,7 @@ async function captureCard(
 export async function previewAllCards(
   data: WrappedCardData,
 ): Promise<Array<{ id: string; label: string; bg: string; dataUrl: string }>> {
-  console.log(data);
+  //console.log(data);
   const av = avatarUrl(data.self.id, data.self.avatar_hash);
   const results = [];
   for (const card of WRAPPED_CARDS) {

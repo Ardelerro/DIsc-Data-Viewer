@@ -23,6 +23,7 @@ import AchievementBubble from "../achievements/AchievementBubble";
 import { TIER_STYLES } from "../types/styles";
 import type { AchievementTier } from "../types/types";
 import PersonalityBadge from "../achievements/PersonalityBadge";
+import StaggeredStatGrid from "./StaggeredStatGrid";
 
 const SelfDisplay: FC = () => {
   const { data } = useData();
@@ -123,7 +124,7 @@ const SelfDisplay: FC = () => {
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
+      transition={{ duration: 0.4, delay: 0.5 }}
       className="p-4 sm:p-6 rounded-2xl bg-white/80 dark:bg-slate-800/70 backdrop-blur-xl shadow-lg ring-1 ring-slate-200 dark:ring-slate-700"
     >
       <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 sm:gap-5 mb-6 text-center sm:text-left">
@@ -154,7 +155,7 @@ const SelfDisplay: FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 text-sm">
+      <StaggeredStatGrid className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 text-sm">
         <Stat icon={<MessageSquare />} label="Avg. per day" value={avgPerDay} />
         <Stat icon={<Users />} label="Avg. per person" value={avgPerPerson} />
         <Stat
@@ -162,12 +163,12 @@ const SelfDisplay: FC = () => {
           label="Total messages"
           value={totalMessages.toLocaleString()}
         />
-      </div>
+      </StaggeredStatGrid>
 
       {activity && (
         <>
           <div className="border-t border-slate-200 dark:border-slate-700 my-5 sm:my-6" />
-          <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 text-sm text-slate-700 dark:text-slate-300">
+          <StaggeredStatGrid className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 text-sm text-slate-700 dark:text-slate-300">
             <Stat
               icon={<Paperclip />}
               label="Attachments sent"
@@ -198,7 +199,7 @@ const SelfDisplay: FC = () => {
               label="Total channels"
               value={totalChannels.toLocaleString()}
             />
-          </div>
+          </StaggeredStatGrid>
         </>
       )}
 

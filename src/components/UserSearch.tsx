@@ -9,6 +9,7 @@ import Stat from "./Stat";
 import SentimentBar from "./charts/SentimentBar";
 import type { ChannelStats } from "../types/discord";
 import SettingsModal from "./SettingsModal";
+import StaggeredStatGrid from "./StaggeredStatGrid";
 
 const UserSearch: FC = () => {
   const { data } = useData();
@@ -153,6 +154,7 @@ const UserSearch: FC = () => {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
+        key={selectedUser}
         className="p-6 rounded-2xl bg-white/80 dark:bg-slate-800/70 backdrop-blur-xl shadow-lg ring-1 ring-slate-200 dark:ring-slate-700"
       >
         <div className="flex items-center justify-between mb-6">
@@ -246,7 +248,7 @@ const UserSearch: FC = () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+            <StaggeredStatGrid className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
               <Stat
                 icon={<MessageSquare />}
                 label="Total Messages"
@@ -268,7 +270,7 @@ const UserSearch: FC = () => {
                   ).toLocaleDateString()}
                 />
               )}
-            </div>
+            </StaggeredStatGrid>
 
             {channelData.sentiment &&  showElements.sentiment && (
               <div>
