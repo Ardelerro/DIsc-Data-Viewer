@@ -23,7 +23,7 @@ const ErrorPage: FC<ErrorPageProps> = ({ code = 404, message }) => {
   const displayMessage = message ?? errorMessages[code] ?? "Unexpected error occurred.";
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-teal-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-teal-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950/30">
       <motion.div
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}

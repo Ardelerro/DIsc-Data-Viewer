@@ -31,14 +31,26 @@ import {
   Ghost,
   Scale,
 } from "lucide-react";
-import type { Achievement, AchievementTier, AchievementDef } from "../types/types";
+import type {
+  Achievement,
+  AchievementTier,
+  AchievementDef,
+} from "../types/types";
 
-function dmChannels(data: ProcessedData): [string, (typeof data.channelStats)[string]][] {
-  return Object.entries(data.channelStats).filter(([key]) => key.startsWith("dm_"));
+function dmChannels(
+  data: ProcessedData,
+): [string, (typeof data.channelStats)[string]][] {
+  return Object.entries(data.channelStats).filter(([key]) =>
+    key.startsWith("dm_"),
+  );
 }
 
-function serverChannels(data: ProcessedData): [string, (typeof data.channelStats)[string]][] {
-  return Object.entries(data.channelStats).filter(([key]) => key.startsWith("channel_"));
+function serverChannels(
+  data: ProcessedData,
+): [string, (typeof data.channelStats)[string]][] {
+  return Object.entries(data.channelStats).filter(([key]) =>
+    key.startsWith("channel_"),
+  );
 }
 
 function countMsgs(hourly: Record<string, number>): number {
@@ -58,7 +70,10 @@ function yearsPresent(data: ProcessedData): number[] {
   return Array.from(years).sort();
 }
 
-function monthsForYear(data: ProcessedData, year: number): Record<string, number> {
+function monthsForYear(
+  data: ProcessedData,
+  year: number,
+): Record<string, number> {
   const result: Record<string, number> = {};
   for (const [key, val] of Object.entries(data.aggregateStats.monthly)) {
     if (key.startsWith(`${year}-`)) result[key] = val;
@@ -92,12 +107,19 @@ function peakHour(hourly: Record<string, number>): string {
   let best = "00";
   let bestVal = -1;
   for (const [h, v] of Object.entries(hourly)) {
-    if (v > bestVal) { bestVal = v; best = h; }
+    if (v > bestVal) {
+      bestVal = v;
+      best = h;
+    }
   }
   return best;
 }
 
-function fractionInHourRange(hourly: Record<string, number>, startH: number, endH: number): number {
+function fractionInHourRange(
+  hourly: Record<string, number>,
+  startH: number,
+  endH: number,
+): number {
   const total = countMsgs(hourly);
   if (total === 0) return 0;
   let sum = 0;
@@ -112,7 +134,8 @@ function fractionInHourRange(hourly: Record<string, number>, startH: number, end
 function stdDev(arr: number[]): number {
   if (arr.length < 2) return 0;
   const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
-  const variance = arr.reduce((sum, v) => sum + (v - mean) ** 2, 0) / arr.length;
+  const variance =
+    arr.reduce((sum, v) => sum + (v - mean) ** 2, 0) / arr.length;
   return Math.sqrt(variance);
 }
 
@@ -125,6 +148,10 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
     icon: MessageSquare,
     iconColor: "stroke-amber-600 dark:stroke-amber-400",
     check: (d) => d.aggregateStats.messageCount >= 1_000,
+    progress: (d) => ({
+      current: d.aggregateStats.messageCount as number,
+      target: 1_000,
+    }),
   },
   {
     id: "social_starter",
@@ -134,7 +161,14 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
     icon: Users,
     iconColor: "stroke-amber-600 dark:stroke-amber-400",
     check: (d) =>
-      dmChannels(d).filter(([, s]) => countMsgs(s.hourly ?? {}) >= 10).length >= 5,
+      dmChannels(d).filter(([, s]) => countMsgs(s.hourly ?? {}) >= 10).length >=
+      5,
+    progress: (d) => {
+      const filtered = dmChannels(d).filter(
+        ([, s]) => countMsgs(s.hourly ?? {}) >= 10,
+      );
+      return { current: filtered.length, target: 5 };
+    },
   },
   {
     id: "show_dont_tell",
@@ -144,6 +178,10 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
     icon: Paperclip,
     iconColor: "stroke-amber-600 dark:stroke-amber-400",
     check: (d) => d.activityStats.attachmentsSent >= 50,
+    progress: (d) => ({
+      current: d.activityStats.attachmentsSent as number,
+      target: 50,
+    }),
   },
   {
     id: "reactor_core",
@@ -153,6 +191,10 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
     icon: Smile,
     iconColor: "stroke-amber-600 dark:stroke-amber-400",
     check: (d) => d.activityStats.addReaction >= 100,
+    progress: (d) => ({
+      current: d.activityStats.addReaction as number,
+      target: 100,
+    }),
   },
   {
     id: "on_a_roll",
@@ -161,8 +203,12 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
     tier: "bronze",
     icon: Flame,
     iconColor: "stroke-amber-600 dark:stroke-amber-400",
-    check: (d) =>
-      dmChannels(d).some(([, s]) => (s.longestStreak ?? 0) >= 7),
+    check: (d) => dmChannels(d).some(([, s]) => (s.longestStreak ?? 0) >= 7),
+    progress: (d) => {
+      const streaks = dmChannels(d).map(([, s]) => s.longestStreak ?? 0);
+      const maxStreak = Math.max(...streaks);
+      return { current: maxStreak, target: 7 };
+    },
   },
   {
     id: "creature_of_habit",
@@ -172,6 +218,10 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
     icon: Monitor,
     iconColor: "stroke-amber-600 dark:stroke-amber-400",
     check: (d) => d.activityStats.appOpened >= 30,
+    progress: (d) => ({
+      current: d.activityStats.appOpened as number,
+      target: 30,
+    }),
   },
   {
     id: "call_me",
@@ -181,6 +231,10 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
     icon: Phone,
     iconColor: "stroke-amber-600 dark:stroke-amber-400",
     check: (d) => d.activityStats.startCall + d.activityStats.joinCall >= 10,
+    progress: (d) => ({
+      current: (d.activityStats.startCall + d.activityStats.joinCall) as number,
+      target: 10,
+    }),
   },
   {
     id: "server_lurker",
@@ -190,6 +244,7 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
     icon: Globe,
     iconColor: "stroke-amber-600 dark:stroke-amber-400",
     check: (d) => activeServerIds(d).size >= 3,
+    progress: (d) => ({ current: activeServerIds(d).size, target: 3 }),
   },
 
   {
@@ -200,27 +255,44 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
     icon: BookOpen,
     iconColor: "stroke-slate-500 dark:stroke-slate-300",
     check: (d) => d.aggregateStats.messageCount >= 10_000,
+    progress: (d) => ({
+      current: d.aggregateStats.messageCount as number,
+      target: 10_000,
+    }),
   },
   {
     id: "month_long_bond",
     name: "Month-long bond",
-    description: "Maintain a 30-day consecutive messaging streak with a single person.",
+    description:
+      "Maintain a 30-day consecutive messaging streak with a single person.",
     tier: "silver",
     icon: Calendar,
     iconColor: "stroke-slate-500 dark:stroke-slate-300",
-    check: (d) =>
-      dmChannels(d).some(([, s]) => (s.longestStreak ?? 0) >= 30),
+    check: (d) => dmChannels(d).some(([, s]) => (s.longestStreak ?? 0) >= 30),
+    progress: (d) => {
+      const streaks = dmChannels(d).map(([, s]) => s.longestStreak ?? 0);
+      const maxStreak = Math.max(...streaks);
+      return { current: maxStreak, target: 30 };
+    },
   },
   {
     id: "server_regular",
     name: "Server regular",
-    description: "Message in 5 or more different servers with 100+ messages each.",
+    description:
+      "Message in 5 or more different servers with 100+ messages each.",
     tier: "silver",
     icon: Globe,
     iconColor: "stroke-slate-500 dark:stroke-slate-300",
     check: (d) => {
       const totals = serverTotals(d);
       return Array.from(totals.values()).filter((v) => v >= 100).length >= 5;
+    },
+    progress: (d) => {
+      const totals = serverTotals(d);
+      const qualifiedServers = Array.from(totals.values()).filter(
+        (v) => v >= 100,
+      );
+      return { current: qualifiedServers.length, target: 5 };
     },
   },
   {
@@ -231,16 +303,28 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
     icon: Mic,
     iconColor: "stroke-slate-500 dark:stroke-slate-300",
     check: (d) => d.activityStats.joinVoice >= 50,
+    progress: (d) => ({
+      current: d.activityStats.joinVoice as number,
+      target: 50,
+    }),
   },
   {
     id: "inner_circle",
     name: "Inner circle",
-    description: "Have 3 people you've each exchanged 1,000 or more messages with.",
+    description:
+      "Have 3 people you've each exchanged 1,000 or more messages with.",
     tier: "silver",
     icon: Handshake,
     iconColor: "stroke-slate-500 dark:stroke-slate-300",
     check: (d) =>
-      dmChannels(d).filter(([, s]) => countMsgs(s.hourly ?? {}) >= 1_000).length >= 3,
+      dmChannels(d).filter(([, s]) => countMsgs(s.hourly ?? {}) >= 1_000)
+        .length >= 3,
+    progress: (d) => {
+      const qualifiedDms = dmChannels(d).filter(
+        ([, s]) => countMsgs(s.hourly ?? {}) >= 1_000,
+      );
+      return { current: qualifiedDms.length, target: 3 };
+    },
   },
   {
     id: "night_shift",
@@ -253,9 +337,17 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
       const h = d.aggregateStats.hourly;
       const nightCount = ["00", "01", "02", "03", "04"].reduce(
         (sum, k) => sum + (h[k] ?? 0),
-        0
+        0,
       );
       return nightCount >= 2_000;
+    },
+    progress: (d) => {
+      const h = d.aggregateStats.hourly;
+      const nightCount = ["00", "01", "02", "03", "04"].reduce(
+        (sum, k) => sum + (h[k] ?? 0),
+        0,
+      );
+      return { current: nightCount, target: 2_000 };
     },
   },
   {
@@ -266,6 +358,10 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
     icon: Archive,
     iconColor: "stroke-slate-500 dark:stroke-slate-300",
     check: (d) => d.activityStats.attachmentsSent >= 500,
+    progress: (d) => ({
+      current: d.activityStats.attachmentsSent as number,
+      target: 500,
+    }),
   },
   {
     id: "conversationalist",
@@ -275,18 +371,29 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
     icon: MessageSquare,
     iconColor: "stroke-slate-500 dark:stroke-slate-300",
     check: (d) => (d.aggregateStats.averageConversationTime ?? 0) >= 1_800,
+    progress: (d) => ({
+      current: (d.aggregateStats.averageConversationTime as number) ?? 0,
+      target: 1_800,
+    }),
   },
 
   {
     id: "the_archive",
     name: "The archive",
-    description: "Discord history spanning 3 or more calendar years of activity.",
+    description:
+      "Discord history spanning 3 or more calendar years of activity.",
     tier: "gold",
     icon: Archive,
     iconColor: "stroke-yellow-600 dark:stroke-yellow-400",
     check: (d) => {
       const years = yearsPresent(d);
       return years.length >= 1 && years[years.length - 1] - years[0] >= 2;
+    },
+    progress: (d) => {
+      const years = yearsPresent(d);
+      if (years.length === 0) return { current: 0, target: 3 };
+      const span = years[years.length - 1] - years[0] + 1;
+      return { current: span, target: 3 };
     },
   },
   {
@@ -297,11 +404,16 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
     icon: Diamond,
     iconColor: "stroke-yellow-600 dark:stroke-yellow-400",
     check: (d) => d.aggregateStats.messageCount >= 100_000,
+    progress: (d) => ({
+      current: d.aggregateStats.messageCount as number,
+      target: 100_000,
+    }),
   },
   {
     id: "ride_or_die",
     name: "Ride or die",
-    description: "One person has been in your top 3 DMs every year for 3 or more years.",
+    description:
+      "One person has been in your top 3 DMs every year for 3 or more years.",
     tier: "gold",
     icon: Link,
     iconColor: "stroke-yellow-600 dark:stroke-yellow-400",
@@ -318,7 +430,10 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
           if (yearCount > 0) channelYearTotals.push({ key, count: yearCount });
         }
         channelYearTotals.sort((a, b) => b.count - a.count);
-        topPerYear.set(year, new Set(channelYearTotals.slice(0, 3).map((c) => c.key)));
+        topPerYear.set(
+          year,
+          new Set(channelYearTotals.slice(0, 3).map((c) => c.key)),
+        );
       }
       const allDmKeys = dmChannels(d).map(([k]) => k);
       for (const key of allDmKeys) {
@@ -330,11 +445,57 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
       }
       return false;
     },
+    progress: (d) => {
+      const years = yearsPresent(d);
+      if (years.length === 0) return { current: 0, target: 3 };
+
+      const topPerYear: Map<number, Set<string>> = new Map();
+
+      for (const year of years) {
+        const channelYearTotals: { key: string; count: number }[] = [];
+
+        for (const [key, stats] of dmChannels(d)) {
+          const yearCount = Object.entries(stats.monthly ?? {})
+            .filter(([m]) => m.startsWith(`${year}-`))
+            .reduce((sum, [, v]) => sum + v, 0);
+
+          if (yearCount > 0) {
+            channelYearTotals.push({ key, count: yearCount });
+          }
+        }
+
+        channelYearTotals.sort((a, b) => b.count - a.count);
+        topPerYear.set(
+          year,
+          new Set(channelYearTotals.slice(0, 3).map((c) => c.key)),
+        );
+      }
+
+      const allDmKeys = dmChannels(d).map(([k]) => k);
+
+      let best = 0;
+
+      for (const key of allDmKeys) {
+        let yearsInTop3 = 0;
+
+        for (const [, top3] of topPerYear) {
+          if (top3.has(key)) yearsInTop3++;
+        }
+
+        best = Math.max(best, yearsInTop3);
+      }
+
+      return {
+        current: best,
+        target: 3,
+      };
+    },
   },
   {
     id: "tidal_wave",
     name: "The tidal wave",
-    description: "Your busiest single month had 5× your average monthly message count.",
+    description:
+      "Your busiest single month had 5× your average monthly message count.",
     tier: "gold",
     icon: Waves,
     iconColor: "stroke-yellow-600 dark:stroke-yellow-400",
@@ -345,6 +506,13 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
       const max = Math.max(...vals);
       return mean > 0 && max / mean >= 5;
     },
+    progress: (d) => {      const vals = monthlyValues(d).filter((v) => v > 0);
+      if (vals.length === 0) return { current: 0, target: 5 };
+      const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+      const max = Math.max(...vals);
+      const ratio = mean > 0 ? max / mean : 0;
+      return { current: ratio, target: 5 };
+    }
   },
   {
     id: "ten_thousand_hour_rule",
@@ -354,6 +522,10 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
     icon: Timer,
     iconColor: "stroke-yellow-600 dark:stroke-yellow-400",
     check: (d) => (d.aggregateStats.longestConversationTime ?? 0) >= 36_000,
+    progress: (d) => ({
+      current: d.aggregateStats.longestConversationTime ?? 0,
+      target: 36_000,
+    }),
   },
   {
     id: "landlord",
@@ -363,6 +535,7 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
     icon: MapIcon,
     iconColor: "stroke-yellow-600 dark:stroke-yellow-400",
     check: (d) => activeServerIds(d).size >= 20,
+    progress: (d) => ({ current: activeServerIds(d).size, target: 20 }),
   },
   {
     id: "voice_veteran",
@@ -372,6 +545,10 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
     icon: Headphones,
     iconColor: "stroke-yellow-600 dark:stroke-yellow-400",
     check: (d) => d.activityStats.joinVoice >= 200,
+    progress: (d) => ({
+      current: d.activityStats.joinVoice as number,
+      target: 200,
+    }),
   },
 
   {
@@ -397,7 +574,10 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
     secret: true,
     check: (d) => {
       const dms = dmChannels(d);
-      const total = dms.reduce((sum, [, s]) => sum + countMsgs(s.hourly ?? {}), 0);
+      const total = dms.reduce(
+        (sum, [, s]) => sum + countMsgs(s.hourly ?? {}),
+        0,
+      );
       if (total === 0) return false;
       const top = Math.max(...dms.map(([, s]) => countMsgs(s.hourly ?? {})));
       return top / total >= 0.8;
@@ -423,7 +603,8 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
   {
     id: "strong_silent_type",
     name: "Strong silent type",
-    description: "Average gap between messages over 24 hours, yet more than 500 total messages.",
+    description:
+      "Average gap between messages over 24 hours, yet more than 500 total messages.",
     tier: "secret",
     icon: MessageCircleOff,
     iconColor: "stroke-purple-500 dark:stroke-purple-300",
@@ -435,7 +616,8 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
   {
     id: "comeback_kid",
     name: "The comeback kid",
-    description: "A month with zero messages followed immediately by your personal best month.",
+    description:
+      "A month with zero messages followed immediately by your personal best month.",
     tier: "secret",
     icon: PartyPopper,
     iconColor: "stroke-purple-500 dark:stroke-purple-300",
@@ -459,8 +641,7 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
     icon: Infinity,
     iconColor: "stroke-purple-500 dark:stroke-purple-300",
     secret: true,
-    check: (d) =>
-      dmChannels(d).some(([, s]) => (s.longestStreak ?? 0) >= 365),
+    check: (d) => dmChannels(d).some(([, s]) => (s.longestStreak ?? 0) >= 365),
   },
   {
     id: "reaction_machine",
@@ -470,8 +651,7 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
     icon: Bot,
     iconColor: "stroke-purple-500 dark:stroke-purple-300",
     secret: true,
-    check: (d) =>
-      d.activityStats.addReaction > d.aggregateStats.messageCount,
+    check: (d) => d.activityStats.addReaction > d.aggregateStats.messageCount,
   },
   {
     id: "insomniac",
@@ -486,13 +666,16 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
   {
     id: "ghost",
     name: "The ghost",
-    description: "Extreme messaging variance — your busiest month is 10× your median month.",
+    description:
+      "Extreme messaging variance — your busiest month is 10× your median month.",
     tier: "secret",
     icon: Ghost,
     iconColor: "stroke-purple-500 dark:stroke-purple-300",
     secret: true,
     check: (d) => {
-      const vals = monthlyValues(d).filter((v) => v > 0).sort((a, b) => a - b);
+      const vals = monthlyValues(d)
+        .filter((v) => v > 0)
+        .sort((a, b) => a - b);
       if (vals.length < 4) return false;
       const median = vals[Math.floor(vals.length / 2)];
       const max = vals[vals.length - 1];
@@ -502,7 +685,8 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
   {
     id: "perfectly_balanced",
     name: "Perfectly balanced",
-    description: "Your hourly message distribution has a coefficient of variation below 0.3.",
+    description:
+      "Your hourly message distribution has a coefficient of variation below 0.3.",
     tier: "secret",
     icon: Scale,
     iconColor: "stroke-purple-500 dark:stroke-purple-300",
@@ -510,7 +694,8 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
     check: (d) => {
       const vals = Object.values(d.aggregateStats.hourly) as number[];
       if (vals.every((v) => v === 0)) return false;
-      const mean = vals.reduce((a: number, b: number) => a + b, 0) / vals.length;
+      const mean =
+        vals.reduce((a: number, b: number) => a + b, 0) / vals.length;
       if (mean === 0) return false;
       return stdDev(vals) / mean < 0.3;
     },
@@ -518,7 +703,7 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
 ];
 
 export function computeAchievements(data: ProcessedData): Achievement[] {
-  return ACHIEVEMENT_DEFS.map(({ check, ...def }) => ({
+  return ACHIEVEMENT_DEFS.map(({ check, progress, ...def }) => ({
     ...def,
     unlocked: (() => {
       try {
@@ -527,6 +712,15 @@ export function computeAchievements(data: ProcessedData): Achievement[] {
         return false;
       }
     })(),
+    progress: progress
+      ? (() => {
+          try {
+            return progress(data);
+          } catch {
+            return undefined;
+          }
+        })()
+      : undefined,
   }));
 }
 
@@ -537,14 +731,22 @@ export function unlockedAchievements(data: ProcessedData): Achievement[] {
     .sort((a, b) => tierOrder.indexOf(a.tier) - tierOrder.indexOf(b.tier));
 }
 
-export function achievementSummary(data: ProcessedData): Record<AchievementTier | "total", { unlocked: number; total: number }> {
+export function achievementSummary(
+  data: ProcessedData,
+): Record<AchievementTier | "total", { unlocked: number; total: number }> {
   const all = computeAchievements(data);
   const tiers: AchievementTier[] = ["bronze", "silver", "gold", "secret"];
   const summary = Object.fromEntries(
     tiers.map((tier) => {
       const forTier = all.filter((a) => a.tier === tier);
-      return [tier, { unlocked: forTier.filter((a) => a.unlocked).length, total: forTier.length }];
-    })
+      return [
+        tier,
+        {
+          unlocked: forTier.filter((a) => a.unlocked).length,
+          total: forTier.length,
+        },
+      ];
+    }),
   ) as Record<AchievementTier, { unlocked: number; total: number }>;
 
   return {
