@@ -1,12 +1,10 @@
 import { toPng } from "html-to-image";
 import type { WrappedCardData } from "../types/discord";
 
-
-
-
-
 const W = 1080;
 const H = 1920;
+
+const cardCache = new Map<string, string>();
 
 
 function avatarUrl(id: string, avatarHash?: string): string {
@@ -19,7 +17,7 @@ function peakHour(hourly: Record<string, number> = {}): string {
   const entries = Object.entries(hourly);
   if (!entries.length) return "—";
   const [h] = entries.sort((a, b) => b[1] - a[1])[0];
-  
+
   const hour = parseInt(h, 10);
   const ampm = hour >= 12 ? "PM" : "AM";
   const display = hour % 12 === 0 ? 12 : hour % 12;
@@ -69,9 +67,6 @@ function topServer(
   }
   return best;
 }
-
-
-
 
 function shell(
   bg: string,
@@ -171,7 +166,6 @@ ${content}
 </body></html>`;
 }
 
-
 function card1(data: WrappedCardData, av: string): string {
   const total = data.aggregateStats.messageCount ?? 0;
   const days = totalDaySpan(data.channelStats);
@@ -190,12 +184,22 @@ function card1(data: WrappedCardData, av: string): string {
   });
 
   const colors = [
-    "#ffffff", "#c7d2fe", "#a5b4fc", "#818cf8",
-    "#93c5fd", "#6ee7b7", "#fde68a", "#f9a8d4",
+    "#ffffff",
+    "#c7d2fe",
+    "#a5b4fc",
+    "#818cf8",
+    "#93c5fd",
+    "#6ee7b7",
+    "#fde68a",
+    "#f9a8d4",
   ];
 
   const wordDataJson = JSON.stringify(
-    cloudWords.map((w, i) => ({ w, s: sizes[i], c: colors[i % colors.length] }))
+    cloudWords.map((w, i) => ({
+      w,
+      s: sizes[i],
+      c: colors[i % colors.length],
+    })),
   );
 
   const content = `
@@ -286,7 +290,6 @@ function card1(data: WrappedCardData, av: string): string {
   return shell("transparent", content, av, data.self.username);
 }
 
-
 function card2(data: WrappedCardData, av: string): string {
   const peak = peakHour(data.aggregateStats.hourly);
   const numPeak = peakHourCount(data.aggregateStats.hourly);
@@ -322,7 +325,6 @@ function card2(data: WrappedCardData, av: string): string {
   return shell("transparent", content, av, data.self.username);
 }
 
-
 function card3(data: WrappedCardData, av: string): string {
   const top = data.topUsers?.[0];
   if (!top) return card4(data, av);
@@ -357,7 +359,6 @@ function card3(data: WrappedCardData, av: string): string {
   return shell("transparent", content, av, data.self.username);
 }
 
-
 function card4(data: WrappedCardData, av: string): string {
   const acts = data.activityStats;
   const reactions = acts?.addReaction ?? 0;
@@ -384,7 +385,6 @@ function card4(data: WrappedCardData, av: string): string {
     </div>`;
   return shell("transparent", content, av, data.self.username);
 }
-
 
 function card5(data: WrappedCardData, av: string): string {
   const month = peakMonth(data.aggregateStats.monthly);
@@ -413,7 +413,6 @@ function card5(data: WrappedCardData, av: string): string {
   return shell("transparent", content, av, data.self.username);
 }
 
-
 export interface WrappedCard {
   id: string;
   label: string;
@@ -429,14 +428,25 @@ export const WRAPPED_CARDS: WrappedCard[] = [
   { id: "peak", label: "Biggest Month", buildHTML: card5, bg: "#EB459E" },
 ];
 
+async function captureCardCached(
+  html: string,
+  key: string,
+  mode: "preview" | "download"
+): Promise<string> {
+  if (cardCache.has(key)) {
+    return cardCache.get(key)!;
+  }
 
-
+  const dataUrl = await captureCard(html, mode);
+  cardCache.set(key, dataUrl);
+  return dataUrl;
+}
 
 async function captureCard(
   html: string,
   mode: "preview" | "download",
 ): Promise<string> {
-  const pixelRatio = mode === "download" ? 4 : 2; 
+  const pixelRatio = mode === "download" ? 4 : 2;
   const settleMs = mode === "download" ? 1400 : 1000;
 
   const iframe = document.createElement("iframe");
@@ -476,8 +486,6 @@ async function captureCard(
   return dataUrl;
 }
 
-
-
 export async function previewAllCards(
   data: WrappedCardData,
 ): Promise<Array<{ id: string; label: string; bg: string; dataUrl: string }>> {
@@ -485,7 +493,7 @@ export async function previewAllCards(
   const av = avatarUrl(data.self.id, data.self.avatar_hash);
   const results = [];
   for (const card of WRAPPED_CARDS) {
-    const dataUrl = await captureCard(card.buildHTML(data, av), "preview");
+    const dataUrl = await captureCardCached(card.buildHTML(data, av),card.id, "preview");
     results.push({ id: card.id, label: card.label, bg: card.bg, dataUrl });
   }
   return results;
@@ -499,7 +507,7 @@ export async function downloadWrappedCard(
   const card = WRAPPED_CARDS.find((c) => c.id === cardId);
   if (!card) throw new Error(`Unknown card id: ${cardId}`);
   const av = avatarUrl(data.self.id, data.self.avatar_hash);
-  const dataUrl = await captureCard(card.buildHTML(data, av), "download");
+  const dataUrl = await captureCardCached(card.buildHTML(data, av), cardId, "download");
   const a = document.createElement("a");
   a.href = dataUrl;
   a.download = filename ?? `discord-wrapped-${cardId}.png`;
