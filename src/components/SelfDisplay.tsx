@@ -128,13 +128,24 @@ const SelfDisplay: FC = () => {
       className="p-4 sm:p-6 rounded-2xl bg-white/80 dark:bg-slate-800/70 backdrop-blur-xl shadow-lg ring-1 ring-slate-200 dark:ring-slate-700"
     >
       <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 sm:gap-5 mb-6 text-center sm:text-left">
-        <motion.img
-          src={avatarUrl(self)}
-          alt={`${self.username}'s avatar`}
-          className="w-20 h-20 sm:w-16 sm:h-16 rounded-full ring-2 ring-indigo-400 dark:ring-indigo-600 flex-shrink-0"
+        <motion.div
+          className="relative flex-shrink-0 w-20 h-20 sm:w-16 sm:h-16 rounded-full p-[2.5px]"
+          style={{
+            background:
+              "conic-gradient(from 0deg, #6366f1, #8b5cf6, #a855f7, #14b8a6, #6366f1)",
+          }}
           whileHover={{ scale: 1.05 }}
           transition={{ type: "spring", stiffness: 300 }}
-        />
+        >
+          <div className="w-full h-full rounded-full bg-white dark:bg-slate-800 p-[2px]">
+            <img
+              src={avatarUrl(self)}
+              alt={`${self.username}'s avatar`}
+              className="w-full h-full rounded-full object-cover"
+            />
+          </div>
+        </motion.div>
+
         <div className="flex-1 min-w-0">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-1">
             <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100 truncate">
