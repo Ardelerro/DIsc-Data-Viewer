@@ -8,7 +8,7 @@ const Search: FC = () => {
 
     if (!data) {
         return (
-            <div className="min-h-screen w-full bg-gradient-to-br from-indigo-50 via-white to-teal-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 flex items-center justify-center">
+            <div className="min-h-screen w-full bg-gradient-to-br from-indigo-50 via-white to-teal-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950/30 flex items-center justify-center">
                 <div className="text-center">
                     <p className="text-slate-600 dark:text-slate-300 mb-4">No data available</p>
                     <Link to="/upload" className="text-indigo-600 dark:text-indigo-400 underline">
@@ -20,7 +20,7 @@ const Search: FC = () => {
     }
 
     return (
-        <div className="min-h-screen w-full bg-gradient-to-br from-indigo-50 via-white to-teal-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 px-4 py-8">
+        <div className="min-h-screen w-full bg-gradient-to-br from-indigo-50 via-white to-teal-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950/30 px-4 py-8">
             <div className="mb-6">
                 <Link
                     to="/"

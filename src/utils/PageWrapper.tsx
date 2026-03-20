@@ -14,7 +14,7 @@ const PageWrapper: FC<PropsWithChildren<{}>> = ({ children }) => (
     exit="out"
     variants={pageVariants}
     transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-    className="w-full min-h-screen bg-gradient-to-br from-indigo-50 via-white to-teal-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800"
+    className="w-full min-h-screen bg-gradient-to-br from-indigo-50 via-white to-teal-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950/30"
   >
     {children}
   </motion.div>

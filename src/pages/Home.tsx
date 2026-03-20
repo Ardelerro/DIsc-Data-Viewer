@@ -153,7 +153,7 @@ const Home: FC = () => {
   }, [data]);
   if (!data) {
     return (
-      <div className="min-h-screen w-full flex flex-col items-center justify-center px-6 sm:px-8 text-center bg-gradient-to-br from-indigo-50 via-white to-teal-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800">
+      <div className="min-h-screen w-full flex flex-col items-center justify-center px-6 sm:px-8 text-center bg-gradient-to-br from-indigo-50 via-white to-teal-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950/30">
         <h1 className="text-3xl sm:text-4xl font-bold mb-4 text-slate-900 dark:text-white">
           Discord Stats Dashboard
         </h1>
@@ -171,7 +171,7 @@ const Home: FC = () => {
   }
 
   return (
-    <div className="relative min-h-screen w-full bg-gradient-to-br from-indigo-50 via-white to-teal-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 overflow-x-hidden">
+    <div className="relative min-h-screen w-full bg-gradient-to-br from-indigo-50 via-white to-teal-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950/30 overflow-x-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-6 mb-8">
           <div>

@@ -4,7 +4,7 @@ type ShowElementsState = {
   topServers: boolean;
   topStreaks: boolean;
   hourlyCharts: boolean;
-monthlyCharts: boolean;
+  monthlyCharts: boolean;
   moodChart: boolean;
 };
 interface StatProps {
@@ -20,14 +20,14 @@ interface SettingsModalProps<T extends Record<string, boolean>> {
   setShowElements: React.Dispatch<React.SetStateAction<T>>;
 }
 interface MonthlyChartProps {
-    data: Record<string, number>;
-    className?: string;
+  data: Record<string, number>;
+  className?: string;
 }
 
 interface HourlyChartProps {
-    data: Record<string, number>;
-    className?: string;
-    title?: string;
+  data: Record<string, number>;
+  className?: string;
+  title?: string;
 }
 
 interface Achievement {
@@ -39,7 +39,9 @@ interface Achievement {
   iconColor: string;
   unlocked: boolean;
   secret?: boolean;
+  progress?: { current: number; target: number };
 }
+
 
 type WrappedSlide = {
   id: string;
@@ -58,6 +60,8 @@ interface AchievementDef {
   icon: LucideIcon;
   iconColor: string;
   secret?: boolean;
+  progress?:(data) => { current: number; target: number };
+
   check: (data: ProcessedData) => boolean;
 }
 
@@ -89,6 +93,17 @@ interface PersonalityDef {
   iconColor: string;
   score: (data: ProcessedData) => { points: number; signals: string[] };
 }
-export { ShowElementsState, StatProps, SettingsModalProps, MonthlyChartProps, 
-  HourlyChartProps, WrappedSlide, AchievementTier, 
-  Achievement, AchievementDef, PersonalityId, Personality, PersonalityDef };
+export {
+  ShowElementsState,
+  StatProps,
+  SettingsModalProps,
+  MonthlyChartProps,
+  HourlyChartProps,
+  WrappedSlide,
+  AchievementTier,
+  Achievement,
+  AchievementDef,
+  PersonalityId,
+  Personality,
+  PersonalityDef,
+};
