@@ -122,32 +122,19 @@ function fitTextBlock(el, maxSize, minSize, maxWidth, maxHeight) {
     el.style.fontSize = size + "px";
   }
 
-  
-  if (size <= minSize + 4) {
-    size = maxSize;
-    el.style.whiteSpace = "normal";
-
-    while (
-      (el.scrollHeight > maxHeight || el.scrollWidth > maxWidth) &&
-      size > minSize
-    ) {
-      size -= 1;
-      el.style.fontSize = size + "px";
-    }
-  }
 }
 
 var CONTENT_W = 900;
 
 function run() {
-  fitTextBlock(document.getElementById("c1-total"), 280, 80, CONTENT_W, 400);
-  fitTextBlock(document.getElementById("c1-summary"), 68, 28, CONTENT_W, 120);
+  fitTextBlock(document.getElementById("c1-total"), 280, 50, CONTENT_W-100, 400);
+  fitTextBlock(document.getElementById("c1-summary"), 68, 28, CONTENT_W-100, 120);
 
-  fitTextBlock(document.getElementById("c2-peak"), 252, 80, CONTENT_W, 300);
-  fitTextBlock(document.getElementById("c2-peak-count"), 52, 28, CONTENT_W, 100);
-  fitTextBlock(document.getElementById("c2-avg"), 185, 60, CONTENT_W, 220);
+  fitTextBlock(document.getElementById("c2-peak"), 252, 80, CONTENT_W-150, 300);
+  fitTextBlock(document.getElementById("c2-peak-count"), 52, 28, CONTENT_W-150, 100);
+  fitTextBlock(document.getElementById("c2-avg"), 185, 60, CONTENT_W-150, 220);
 
-  fitTextBlock(document.getElementById("top-user-name"), 168, 48, CONTENT_W, 300);
+  fitTextBlock(document.getElementById("top-user-name"), 168, 0, CONTENT_W-50, 300);
 
   var RUNNER_W = CONTENT_W - 332;
   document.querySelectorAll(".runner-name").forEach(function(el) {
@@ -190,24 +177,112 @@ function card1(data: WrappedCardData, av: string): string {
   const days = totalDaySpan(data.channelStats);
   const years = (days / 365).toFixed(1);
 
+  const words: string[] = (data.aggregateStats as any).topWords ?? [];
+  const cloudWords = words.slice(0, 40);
+
+  const sizes = cloudWords.map((_, i) => {
+    if (i === 0) return 88;
+    if (i < 3) return 68;
+    if (i < 8) return 52;
+    if (i < 16) return 40;
+    if (i < 28) return 30;
+    return 22;
+  });
+
+  const colors = [
+    "#ffffff", "#c7d2fe", "#a5b4fc", "#818cf8",
+    "#93c5fd", "#6ee7b7", "#fde68a", "#f9a8d4",
+  ];
+
+  const wordDataJson = JSON.stringify(
+    cloudWords.map((w, i) => ({ w, s: sizes[i], c: colors[i % colors.length] }))
+  );
+
   const content = `
     <div style="position:absolute;inset:0;background:linear-gradient(160deg,#5865F2 0%,#3b2fcb 60%,#1a1240 100%);"></div>
     <div style="position:absolute;top:-180px;right:-180px;width:860px;height:860px;border-radius:50%;border:2px solid rgba(255,255,255,0.06);pointer-events:none;"></div>
     <div style="position:absolute;top:-90px;right:-90px;width:630px;height:630px;border-radius:50%;border:2px solid rgba(255,255,255,0.1);pointer-events:none;"></div>
 
-    <div style="position:absolute;top:130px;left:90px;right:90px;">
-      <div style="font-size:24px;letter-spacing:0.22em;text-transform:uppercase;opacity:0.5;margin-bottom:14px;">Your Discord, all of it</div>
-      <div id="c1-total" class="fit-text" style="font-family:'Bebas Neue',sans-serif;font-size:280px;line-height:0.88;letter-spacing:-4px;">${total.toLocaleString()}</div>
-      <div id="c1-summary" class="fit-text" style="font-size:68px;font-weight:700;margin-top:28px;opacity:0.72;">messages sent</div>
+    <!-- Top: total count -->
+    <div style="position:absolute;top:100px;left:90px;right:90px;">
+      <div style="font-size:22px;letter-spacing:0.22em;text-transform:uppercase;opacity:0.5;margin-bottom:10px;">Your Discord, all of it</div>
+      <div id="c1-total" class="fit-text" style="font-family:'Bebas Neue',sans-serif;font-size:200px;line-height:0.88;letter-spacing:-4px;">${total.toLocaleString()}</div>
+      <div id="c1-summary" class="fit-text" style="font-size:52px;font-weight:700;margin-top:14px;opacity:0.72;">messages sent</div>
     </div>
 
+    <!-- Word cloud in the middle -->
+    <canvas id="wordcloud-canvas" style="position:absolute;left:0;right:0;top:480px;width:1080px;height:1100px;"></canvas>
+
+    <!-- Bottom -->
     <div style="position:absolute;bottom:160px;left:90px;right:90px;">
-      <div style="width:110px;height:4px;background:rgba(255,255,255,0.3);margin-bottom:44px;border-radius:2px;"></div>
-      <div style="font-size:36px;opacity:0.55;line-height:1.6;">
+      <div style="width:110px;height:4px;background:rgba(255,255,255,0.3);margin-bottom:28px;border-radius:2px;"></div>
+      <div style="font-size:32px;opacity:0.55;line-height:1.6;">
         Over <strong style="opacity:1;color:#fff;">${days.toLocaleString()} days</strong> —
         that's roughly <strong style="opacity:1;color:#fff;">${years} years</strong> of history.
       </div>
-    </div>`;
+    </div>
+
+    <script>
+    (function() {
+      var words = ${wordDataJson};
+      var canvas = document.getElementById('wordcloud-canvas');
+      if (!canvas || !words.length) return;
+      var CW = 1080, CH = 1100;
+      canvas.width = CW;
+      canvas.height = CH;
+      var ctx = canvas.getContext('2d');
+
+      var placed = []; // {x,y,w,h}[]
+
+      function overlaps(x, y, w, h) {
+        var pad = 10;
+        for (var i = 0; i < placed.length; i++) {
+          var p = placed[i];
+          if (x < p.x + p.w + pad && x + w + pad > p.x &&
+              y < p.y + p.h + pad && y + h + pad > p.y) return true;
+        }
+        return false;
+      }
+
+      var cx = CW / 2, cy = CH / 2;
+
+      function tryPlace(word, size, color) {
+        ctx.font = 'bold ' + size + 'px "Space Grotesk", sans-serif';
+        var tw = ctx.measureText(word).width;
+        var th = size * 1.2;
+
+        for (var r = 0; r < 500; r += 2) {
+          var steps = Math.max(1, Math.round(2 * Math.PI * r / 18));
+          for (var step = 0; step < steps; step++) {
+            var angle = (step / steps) * 2 * Math.PI + (r * 0.15);
+            var ox = r * Math.cos(angle);
+            var oy = r * Math.sin(angle) * 0.7;
+            var x = cx + ox - tw / 2;
+            var y = cy + oy;
+
+            if (x < 20 || x + tw > CW - 20 || y - th < 20 || y > CH - 20) continue;
+
+            if (!overlaps(x, y - th, tw, th)) {
+              placed.push({x: x, y: y - th, w: tw, h: th});
+              ctx.globalAlpha = 0.92;
+              ctx.fillStyle = color;
+              ctx.fillText(word, x, y);
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+
+      document.fonts.ready.then(function() {
+        placed = [];
+        for (var i = 0; i < words.length; i++) {
+          tryPlace(words[i].w, words[i].s, words[i].c);
+        }
+      });
+    })();
+    </script>`;
+
   return shell("transparent", content, av, data.self.username);
 }
 
@@ -261,7 +336,7 @@ function card3(data: WrappedCardData, av: string): string {
       <div style="font-size:24px;letter-spacing:0.22em;text-transform:uppercase;color:#a78bfa;margin-bottom:80px;">Your #1 person</div>
 
       <div id="top-user-name" class="fit-text"
-          style="font-family:'Bebas Neue',sans-serif;font-size:168px;line-height:0.92;margin-bottom:18px;max-width:100%;overflow:visible;overflow-wrap:anywhere">
+          style="font-family:'Bebas Neue',sans-serif;font-size:168px;line-height:0.92;margin-bottom:18px;max-width:100%;">
         ${top.username}
       </div>
       <div style="font-size:42px;opacity:0.48;margin-bottom:110px;">${top.messageCount.toLocaleString()} messages together</div>

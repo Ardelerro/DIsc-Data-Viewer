@@ -171,7 +171,7 @@ async function processChannels(zip: JSZip) {
       if (stats.messageCount > 0) stats.sentiment.average /= stats.messageCount;
       stats.averageGapBetweenMessages =
         stats.numGaps > 0 ? stats.totalGapTime / stats.numGaps : 0;
-      stats.topWords = getTopWords(localWordFreq, 5);
+      stats.topWords = getTopWords(localWordFreq, 50);
       const streak = calculateStreak(messageDates);
       stats.longestStreak = streak.length;
       stats.streakStart = streak.start;
@@ -196,7 +196,7 @@ async function processChannels(zip: JSZip) {
     aggregateStats.numGaps > 0
       ? aggregateStats.totalGapTime / aggregateStats.numGaps
       : 0;
-  aggregateStats.topWords = getTopWords(globalWordFreq, 5);
+  aggregateStats.topWords = getTopWords(globalWordFreq, 50);
 
   for (const hour in aggregateStats.hourly) {
     const count = aggregateStats.hourly[hour];

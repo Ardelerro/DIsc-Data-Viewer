@@ -94,7 +94,6 @@ const Home: FC = () => {
       });
     }
     topUsers.sort((a, b) => b.messageCount - a.messageCount);
-    // server stats flatten
     const serverStats: WrappedCardData["serverStats"] = {};
 
     for (const [key, stats] of Object.entries(data.channelStats)) {
@@ -135,6 +134,7 @@ const Home: FC = () => {
         messageCount: data.aggregateStats.messageCount,
         hourly: data.aggregateStats.hourly,
         monthly: data.aggregateStats.monthly,
+        topWords: data.aggregateStats.topWords,
       },
       channelStats: Object.fromEntries(
         Object.entries(data.channelStats).map(([id, ch]) => [
