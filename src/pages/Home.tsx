@@ -1,18 +1,18 @@
 import type { FC } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, lazy } from "react";
 import { useData } from "../context/DataContext";
 import TopUsers from "../components/topDisplays/TopUsers";
 import TopChannels from "../components/topDisplays/TopChannels";
 import TopServers from "../components/topDisplays/TopServers";
 import TopStreaks from "../components/topDisplays/TopStreaks";
 import SelfDisplay from "../components/SelfDisplay";
-import HourlyChart from "../components/charts/HourlyChart";
-import HourlyMoodChart from "../components/charts/HourlyMoodChart";
+const HourlyChart = lazy(() => import("../components/charts/HourlyChart"));
+const HourlyMoodChart = lazy(() => import("../components/charts/HourlyMoodChart"));
 import SettingsModal from "../components/SettingsModal";
 import type { ShowElementsState } from "../types/types";
-import MonthlyChart from "../components/charts/MonthlyChart";
+const MonthlyChart = lazy(() => import("../components/charts/MonthlyChart"));
 import { createPortal } from "react-dom";
 import {
   Settings,
@@ -86,7 +86,7 @@ const Home: FC = () => {
         (a, b) => a + b,
         0,
       );
-      console.log(key, stats.recipientName, totalMessages);
+      //console.log(key, stats.recipientName, totalMessages);
 
       topUsers.push({
         username: stats.recipientName,
