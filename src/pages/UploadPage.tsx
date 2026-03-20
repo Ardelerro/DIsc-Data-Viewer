@@ -2,8 +2,7 @@ import type { FC } from "react";
 import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { useData } from "../context/DataContext";
-import { Navigate } from "react-router-dom";
-
+import { useNavigate } from "react-router-dom";
 const UploadPage: FC = () => {
   const { uploadData, isLoading } = useData();
 
@@ -16,6 +15,7 @@ const UploadPage: FC = () => {
 
   const progressHistory = useRef<{ progress: number; time: number }[]>([]);
   const smoothedMsPerPercent = useRef<number | null>(null);
+  const navigate = useNavigate();
 
   const onProgress = (newProgress: number) => {
     const now = performance.now();
@@ -74,7 +74,7 @@ const UploadPage: FC = () => {
       setProgress(100);
       setEta(0);
 
-      setTimeout(() => <Navigate to="/" /> , 500);
+      setTimeout(() => navigate("/"), 500);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to process file");
       setProgress(0);
