@@ -30,6 +30,17 @@ interface HourlyChartProps {
     title?: string;
 }
 
+interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  tier: AchievementTier;
+  icon: LucideIcon;
+  iconColor: string;
+  unlocked: boolean;
+  secret?: boolean;
+}
+
 type WrappedSlide = {
   id: string;
   priority: number;
@@ -37,4 +48,47 @@ type WrappedSlide = {
   render: () => HTMLElement | null;
 };
 
-export { ShowElementsState, StatProps, SettingsModalProps, MonthlyChartProps, HourlyChartProps, WrappedSlide };
+type AchievementTier = "bronze" | "silver" | "gold" | "secret";
+
+interface AchievementDef {
+  id: string;
+  name: string;
+  description: string;
+  tier: AchievementTier;
+  icon: LucideIcon;
+  iconColor: string;
+  secret?: boolean;
+  check: (data: ProcessedData) => boolean;
+}
+
+type PersonalityId =
+  | "night_owl"
+  | "quick_draw"
+  | "broadcaster"
+  | "loyalist"
+  | "novelist"
+  | "ghost"
+  | "reactor"
+  | "voice_first"
+  | "balanced";
+
+interface Personality {
+  id: PersonalityId;
+  name: string;
+  tagline: string;
+  icon: LucideIcon;
+  iconColor: string;
+  signals: string[];
+}
+
+interface PersonalityDef {
+  id: PersonalityId;
+  name: string;
+  tagline: string;
+  icon: LucideIcon;
+  iconColor: string;
+  score: (data: ProcessedData) => { points: number; signals: string[] };
+}
+export { ShowElementsState, StatProps, SettingsModalProps, MonthlyChartProps, 
+  HourlyChartProps, WrappedSlide, AchievementTier, 
+  Achievement, AchievementDef, PersonalityId, Personality, PersonalityDef };
