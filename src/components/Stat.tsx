@@ -6,7 +6,7 @@ import type { StatProps } from "../types/types";
 const Stat: FC<StatProps> = ({ icon, label, value }) => (
   <motion.div
     whileHover={{ scale: 1.03, y: -2 }}
-    transition={{ type: "spring", stiffness: 200 }}
+    transition={{ duration: 0.15 }}
     className="flex items-center gap-3 rounded-lg bg-white/60 dark:bg-slate-700/50 p-3 shadow-sm"
   >
     <div className="text-indigo-600 dark:text-indigo-400">{icon}</div>
