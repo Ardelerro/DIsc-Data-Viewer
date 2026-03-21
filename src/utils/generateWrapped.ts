@@ -493,7 +493,7 @@ export async function previewAllCards(
   const av = avatarUrl(data.self.id, data.self.avatar_hash);
   const results = [];
   for (const card of WRAPPED_CARDS) {
-    const dataUrl = await captureCardCached(card.buildHTML(data, av),card.id, "preview");
+    const dataUrl = await captureCardCached(card.buildHTML(data, av),card.id + "preview", "preview");
     results.push({ id: card.id, label: card.label, bg: card.bg, dataUrl });
   }
   return results;
@@ -507,7 +507,7 @@ export async function downloadWrappedCard(
   const card = WRAPPED_CARDS.find((c) => c.id === cardId);
   if (!card) throw new Error(`Unknown card id: ${cardId}`);
   const av = avatarUrl(data.self.id, data.self.avatar_hash);
-  const dataUrl = await captureCardCached(card.buildHTML(data, av), cardId, "download");
+  const dataUrl = await captureCardCached(card.buildHTML(data, av), cardId + "download", "download");
   const a = document.createElement("a");
   a.href = dataUrl;
   a.download = filename ?? `discord-wrapped-${cardId}.png`;
