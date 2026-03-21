@@ -12,7 +12,7 @@ import {
   Monitor,
   BookUser,
 } from "lucide-react";
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Stat from "./Stat";
 import { computePersonality } from "../achievements/computePersonality";
 import {
@@ -27,6 +27,19 @@ import StaggeredStatGrid from "./StaggeredStatGrid";
 
 const SelfDisplay: FC = () => {
   const { data } = useData();
+  const [shouldAnimateAchs, setShouldAnimateAchs] = useState(false);
+
+  useEffect(() => {
+    if (!data) return;
+
+    const key = "achievements_seen_v5";
+    const seen = localStorage.getItem(key);
+
+    if (!seen) {
+      setShouldAnimateAchs(true);
+      localStorage.setItem(key, "true");
+    }
+  }, [data]);
 
   const personality = useMemo(
     () => (data ? computePersonality(data) : null),
@@ -264,8 +277,13 @@ const SelfDisplay: FC = () => {
             )}
 
             <div className="flex flex-wrap gap-2">
-              {displayAchs.map((ach) => (
-                <AchievementBubble key={ach.id} achievement={ach} />
+              {displayAchs.map((ach, i) => (
+                <AchievementBubble
+                  key={ach.id}
+                  achievement={ach}
+                  animate={shouldAnimateAchs}
+                  index={i}
+                />
               ))}
             </div>
           </div>
