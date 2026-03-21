@@ -5,12 +5,15 @@ import type { Achievement } from "../types/types";
 import { AnimatePresence, motion } from "framer-motion";
 import { Lock } from "lucide-react";
 
-const AchievementBubble: FC<{ achievement: Achievement }> = ({
-  achievement,
-}) => {
+const AchievementBubble: FC<{
+  achievement: Achievement;
+  animate?: boolean;
+  index?: number;
+}> = ({ achievement, animate = false, index = 0 }) => {
   const [hovered, setHovered] = useState(false);
   const tier = TIER_STYLES[achievement.tier];
   const Icon = achievement.icon;
+  const shouldPlay = animate && achievement.unlocked;
 
   if (!achievement.unlocked) {
     return (
@@ -80,12 +83,39 @@ const AchievementBubble: FC<{ achievement: Achievement }> = ({
       onMouseLeave={() => setHovered(false)}
     >
       <motion.div
+        initial={shouldPlay ? { scale: 0, opacity: 0 } : false}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{
+          type: "spring",
+          stiffness: 260,
+          damping: 18,
+          delay: shouldPlay ? index * 0.08 : 0,
+        }}
         whileHover={{ scale: 1.12, y: -2 }}
-        transition={{ type: "spring", stiffness: 400, damping: 18 }}
-        className={`w-11 h-11 rounded-xl flex items-center justify-center border cursor-default select-none ${tier.bg} ${tier.border}`}
+        className="relative"
       >
-        <Icon className={`w-4 h-4 ${achievement.iconColor}`} />
+        {shouldPlay && (
+          <motion.div
+            initial={{ scale: 0.6, opacity: 0.8 }}
+            animate={{ scale: 1.8, opacity: 0 }}
+            transition={{
+              duration: 0.6,
+              ease: "easeOut",
+              delay: index * 0.08,
+            }}
+            className="absolute inset-0 rounded-xl border-2 border-yellow-400 pointer-events-none"
+          />
+        )}
+
+        {/* ACTUAL BUBBLE */}
+        <div
+          className={`w-11 h-11 rounded-xl flex items-center justify-center border cursor-default select-none ${tier.bg} ${tier.border}`}
+        >
+          <Icon className={`w-4 h-4 ${achievement.iconColor}`} />
+        </div>
       </motion.div>
+
+      {/* TOOLTIP (unchanged) */}
       <AnimatePresence>
         {hovered && (
           <motion.div
@@ -98,35 +128,10 @@ const AchievementBubble: FC<{ achievement: Achievement }> = ({
           >
             <div className="bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-xl px-3 py-2.5 shadow-xl">
               <div className="flex items-center gap-2 mb-1">
-                <span
-                  className={`w-2 h-2 rounded-full flex-shrink-0 ${tier.dot}`}
-                />
-                <p className="text-xs font-semibold leading-tight">
-                  {achievement.name}
-                </p>
+                <span className={`w-2 h-2 rounded-full ${tier.dot}`} />
+                <p className="text-xs font-semibold">{achievement.name}</p>
               </div>
-              <p className="text-xs opacity-75 leading-relaxed">
-                {achievement.description}
-              </p>
-              {achievement.progress &&
-                (() => {
-                  const { current, target } = achievement.progress;
-                  const percent = Math.min(current / target, 1);
-                  return (
-                    <div className="mt-2">
-                      <div className="flex justify-between text-[10px] opacity-70 mb-1">
-                        <span>{Math.floor(current)}</span>
-                        <span>{target}</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-slate-700 dark:bg-slate-300 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-white dark:bg-slate-900"
-                          style={{ width: `${percent * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })()}
+              <p className="text-xs opacity-75">{achievement.description}</p>
             </div>
             <div className="flex justify-center">
               <div className="w-2 h-2 bg-slate-900 dark:bg-slate-100 rotate-45 -mt-1" />

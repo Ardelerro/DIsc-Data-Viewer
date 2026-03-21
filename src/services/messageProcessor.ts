@@ -13,23 +13,8 @@ async function processMessages(
   p0: (msgProgress: number) => void,
 ) {
   const sentiment = new Sentiment();
-  const MESSAGE_GAP_THRESHOLD_S = 30 * 60; // pre-multiply once
+  const MESSAGE_GAP_THRESHOLD_S = 30 * 60;
 
-  /*
-  const aggregateStats = {
-    hourly: {} as Record<string, number>,
-    monthly: {} as Record<string, number>,
-    topWords: [] as string[],
-    totalGapTime: 0,
-    numGaps: 0,
-    messageCount: 0,
-    averageGapBetweenMessages: 0,
-    averageConversationTime: 0,
-    longestConversationTime: 0,
-    hourlySentimentTotal: {} as Record<string, number>,
-    hourlySentimentAverage: {} as Record<string, number>,
-  };
-  */
   const aggregateStats: AggregateStats = {
     hourly: {},
     monthly: {},
@@ -46,6 +31,8 @@ async function processMessages(
   const channelStats: Record<string, ChannelStats> = {};
   const dmManifest: string[] = [];
   const globalWordFreq: Record<string, number> = {};
+
+  const globalHourlyAnalyzedCount: Record<string, number> = {};
   const deletedUserCountMap: Record<string, number> = {};
 
   const messageFiles = zip.file(/^Messages\/c\d+\/messages\.json$/i) || [];
@@ -83,9 +70,18 @@ async function processMessages(
       let prevMessageTime: number | null = null;
       let startTime: number | null = null;
 
+      let analyzedCount = 0;
+
+      const hourlyAnalyzedCount: Record<string, number> = {};
+      const localHourlySentimentTotal: Record<string, number> = {};
+
       messages.sort((a: any, b: any) => {
-        const tA = a.Timestamp ? new Date(a.Timestamp.replace(" ", "T")).getTime() : 0;
-        const tB = b.Timestamp ? new Date(b.Timestamp.replace(" ", "T")).getTime() : 0;
+        const tA = a.Timestamp
+          ? new Date(a.Timestamp.replace(" ", "T")).getTime()
+          : 0;
+        const tB = b.Timestamp
+          ? new Date(b.Timestamp.replace(" ", "T")).getTime()
+          : 0;
         return tA - tB;
       });
 
@@ -101,7 +97,8 @@ async function processMessages(
         stats.hourly[hour] = (stats.hourly[hour] || 0) + 1;
         stats.monthly[month] = (stats.monthly[month] || 0) + 1;
         aggregateStats.hourly[hour] = (aggregateStats.hourly[hour] || 0) + 1;
-        aggregateStats.monthly[month] = (aggregateStats.monthly[month] || 0) + 1;
+        aggregateStats.monthly[month] =
+          (aggregateStats.monthly[month] || 0) + 1;
         stats.messageCount++;
         aggregateStats.messageCount++;
 
@@ -110,7 +107,12 @@ async function processMessages(
         } else if (prevMessageTime !== null) {
           const gap = currentTime - prevMessageTime;
           if (gap > MESSAGE_GAP_THRESHOLD_S) {
-            stats.totalConversationTime += prevMessageTime - startTime;
+            const conversationDuration = prevMessageTime - startTime;
+            stats.totalConversationTime += conversationDuration;
+
+            if (conversationDuration > stats.longestConversationTime) {
+              stats.longestConversationTime = conversationDuration;
+            }
             stats.totalGapTime += gap - MESSAGE_GAP_THRESHOLD_S;
             stats.numGaps++;
             aggregateStats.totalGapTime += gap - MESSAGE_GAP_THRESHOLD_S;
@@ -120,17 +122,25 @@ async function processMessages(
         }
 
         prevMessageTime = currentTime;
-        messageDates.add(timestamp.toISOString().slice(0, 10)); // avoids split() array alloc
+        messageDates.add(timestamp.toISOString().slice(0, 10));
 
         if (msg.Contents) {
           const result = sentiment.analyze(msg.Contents);
           if (result.score > 0) stats.sentiment.positive++;
           else if (result.score < 0) stats.sentiment.negative++;
           else stats.sentiment.neutral++;
+
           stats.sentiment.average += result.score;
+          analyzedCount++;
 
           aggregateStats.hourlySentimentTotal[hour] =
             (aggregateStats.hourlySentimentTotal[hour] || 0) + result.score;
+
+          localHourlySentimentTotal[hour] =
+            (localHourlySentimentTotal[hour] || 0) + result.score;
+          hourlyAnalyzedCount[hour] = (hourlyAnalyzedCount[hour] || 0) + 1;
+          globalHourlyAnalyzedCount[hour] =
+            (globalHourlyAnalyzedCount[hour] || 0) + 1;
 
           const words = msg.Contents.toLowerCase()
             .replace(/[^a-z0-9\s]/g, "")
@@ -145,10 +155,15 @@ async function processMessages(
       }
 
       if (startTime !== null && prevMessageTime !== null) {
-        stats.totalConversationTime += prevMessageTime - startTime;
+        const conversationDuration = prevMessageTime - startTime;
+        stats.totalConversationTime += conversationDuration;
+        if (conversationDuration > stats.longestConversationTime) {
+          stats.longestConversationTime = conversationDuration;
+        }
       }
-      if (stats.messageCount > 0) {
-        stats.sentiment.average /= stats.messageCount;
+
+      if (analyzedCount > 0) {
+        stats.sentiment.average /= analyzedCount;
       }
       stats.averageGapBetweenMessages =
         stats.numGaps > 0 ? stats.totalGapTime / stats.numGaps : 0;
@@ -156,6 +171,14 @@ async function processMessages(
         stats.messageCount > 0
           ? stats.totalConversationTime / (stats.numGaps + 1)
           : 0;
+
+      const channelHourlySentimentAverage: Record<string, number> = {};
+      for (const hour in stats.hourly) {
+        const analyzed = hourlyAnalyzedCount[hour] || 0;
+        const total = localHourlySentimentTotal[hour] || 0;
+        channelHourlySentimentAverage[hour] =
+          analyzed > 0 ? total / analyzed : 0;
+      }
 
       const topWords = getTopWords(localWordFreq, 50);
       const streak = calculateStreak(messageDates);
@@ -171,10 +194,12 @@ async function processMessages(
       stats.longestStreak = streak.length;
       stats.streakStart = streak.start;
       stats.streakEnd = streak.end;
+      stats.hourlySentimentAverage = channelHourlySentimentAverage;
 
       if (channelType === "DM") {
         const recipientId =
-          channelData.recipients?.find((r: string) => r !== yourId) ?? "unknown";
+          channelData.recipients?.find((r: string) => r !== yourId) ??
+          "unknown";
 
         let recipientName =
           userMapping[recipientId]?.username ?? `Unknown (${recipientId})`;
@@ -186,7 +211,8 @@ async function processMessages(
         }
 
         stats.recipientName = recipientName;
-        stats.firstMessageTimestamp = messageDates.values().next().value ?? null;
+        stats.firstMessageTimestamp =
+          messageDates.values().next().value ?? null;
         channelStats[`dm_${channelId}`] = stats;
         dmManifest.push(`dm_${channelId}.json`);
       } else {
@@ -198,7 +224,10 @@ async function processMessages(
         channelStats[`channel_${channelId}`] = stats;
       }
     } catch (err) {
-      console.warn(`Failed processing messages for file: ${messagesFile.name}`, err);
+      console.warn(
+        `Failed processing messages for file: ${messagesFile.name}`,
+        err,
+      );
     }
   }
 
@@ -209,9 +238,10 @@ async function processMessages(
   aggregateStats.topWords = getTopWords(globalWordFreq, 50);
 
   for (const hour in aggregateStats.hourly) {
-    const count = aggregateStats.hourly[hour];
+    const total = aggregateStats.hourlySentimentTotal[hour] || 0;
+    const analyzed = globalHourlyAnalyzedCount[hour] || 0;
     aggregateStats.hourlySentimentAverage[hour] =
-      count > 0 ? (aggregateStats.hourlySentimentTotal[hour] || 0) / count : 0;
+      analyzed > 0 ? total / analyzed : 0;
   }
 
   return { aggregateStats, channelStats, dmManifest };
