@@ -10,6 +10,7 @@ import SentimentBar from "./charts/SentimentBar";
 import type { ChannelStats } from "../types/discord";
 import SettingsModal from "./SettingsModal";
 import StaggeredStatGrid from "./StaggeredStatGrid";
+import UserCombobox from "./UserComboBox";
 
 const UserSearch: FC = () => {
   const { data } = useData();
@@ -70,13 +71,7 @@ const UserSearch: FC = () => {
     }));
   }, [data, rankingType, minMessages]);
 
-  const userOptions = useMemo(() => {
-    return rankedUsers.map(({ key, name, rank }) => (
-      <option key={key} value={key}>
-        #{rank} — {name}
-      </option>
-    ));
-  }, [rankedUsers]);
+
 
   const channelData = useMemo<ChannelStats | null>(() => {
     if (!data || !selectedUser) return null;
@@ -216,17 +211,13 @@ const UserSearch: FC = () => {
           <label className="block mb-3 text-sm text-slate-700 dark:text-slate-300 font-medium">
             Select a user
           </label>
-          <motion.select
-            value={selectedUser ?? ""}
-            onChange={(e) => setSelectedUser(e.target.value || null)}
-            className="w-full px-4 py-3 rounded-xl bg-white/60 dark:bg-slate-700/50 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:outline-none transition-all"
-            whileFocus={{ scale: 1.02 }}
-          >
-            <option value="" disabled>
-              Choose a user
-            </option>
-            {userOptions}
-          </motion.select>
+        <UserCombobox
+          users={rankedUsers}
+          selected={selectedUser}
+          onChange={setSelectedUser}
+          data={data}
+          rankingType={rankingType}
+        />
         </div>
 
         {channelData && (
