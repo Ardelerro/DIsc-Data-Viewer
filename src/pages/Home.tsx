@@ -356,7 +356,12 @@ const Home: FC = () => {
             >
               <Download className="w-6 h-6 stroke-emerald-500 dark:stroke-emerald-300" />
             </div>
-
+            <div
+              className="p-3 rounded-full cursor-pointer active:scale-90 transition"
+              onClick={() => setShowWrapped(true)}
+            >
+              <Share2Icon className="w-6 h-6 stroke-slate-600 hover:stroke-slate-700 dark:stroke-slate-300 dark:hover:stroke-slate-200 transition-colors" />
+            </div>
             <div
               onClick={toggleTheme}
               className="relative w-6 h-6 p-3 rounded-full cursor-pointer active:scale-90 transition"
