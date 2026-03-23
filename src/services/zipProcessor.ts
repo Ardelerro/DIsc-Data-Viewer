@@ -1,6 +1,5 @@
 import type JSZip from "jszip";
 import type { ProcessedData, Self } from "../types/discord";
-import { processChannels } from "./channelProcessor";
 import { processMessages } from "./messageProcessor";
 import { map } from "../utils/progressUtils";
 import { processServers } from "./processServer";
@@ -21,51 +20,24 @@ async function processZipData(
   ]);
   update(1);
 
-  const [
-    {
-      channelMapping,
-      channelNaming,
-      channelManifest,
-      channelStats: channelStatsFromChannels,
-    },
-    serverMapping,
-  ] = await Promise.all([processChannels(zip), processServers(zip)]);
-  update(1);
-
-  const {
+  const [serverMapping, {
     aggregateStats,
-    channelStats: channelStatsFromMessages,
-    dmManifest,
-  } = await processMessages(
-    zip,
+    channelStats,
     channelMapping,
-    userMapping,
-    self.id,
-    (msgProgress: number) => {
-      update(map(msgProgress, 0, 100, 8, 100));
-    },
-  );
-
-  const mergedChannelStats: Record<string, any> = {};
-
-  for (const key in channelStatsFromChannels) {
-    mergedChannelStats[key] = {
-      ...channelStatsFromChannels[key],
-      ...channelStatsFromMessages[key],
-      firstMessageTimestamp:
-        channelStatsFromChannels[key].firstMessageTimestamp,
-      topWords: channelStatsFromChannels[key].topWords,
-      longestStreak: channelStatsFromChannels[key].longestStreak,
-      streakStart: channelStatsFromChannels[key].streakStart,
-      streakEnd: channelStatsFromChannels[key].streakEnd,
-    };
-  }
-
-  for (const key in channelStatsFromMessages) {
-    if (!mergedChannelStats[key]) {
-      mergedChannelStats[key] = channelStatsFromMessages[key];
-    }
-  }
+    channelNaming,
+    channelManifest,
+    dmManifest,
+  }] = await Promise.all([
+    processServers(zip),
+    processMessages(
+      zip,
+      userMapping,
+      self.id,
+      (msgProgress: number) => {
+        update(map(msgProgress, 0, 100, 0, 99));
+      },
+    ),
+  ]);
 
   return {
     self,
@@ -75,7 +47,7 @@ async function processZipData(
     channelManifest,
     serverMapping,
     aggregateStats,
-    channelStats: mergedChannelStats,
+    channelStats,
     dmManifest,
     activityStats: {
       addReaction: 0,
@@ -91,10 +63,7 @@ async function processZipData(
 async function extractSelfData(zip: JSZip): Promise<Self> {
   const userFile = zip.file(/^Account\/user\.json$/i)[0];
   if (!userFile) throw new Error("Account/user.json not found");
-
-  const content = await userFile.async("text");
-  const data = JSON.parse(content);
-
+  const data = JSON.parse(await userFile.async("text"));
   return {
     id: data.id,
     username: data.username,
@@ -107,9 +76,7 @@ async function extractUserMapping(zip: JSZip) {
 
   const userFile = zip.file(/^Account\/user\.json$/i)[0];
   if (userFile) {
-    const content = await userFile.async("text");
-    const data = JSON.parse(content);
-
+    const data = JSON.parse(await userFile.async("text"));
     if (data.relationships) {
       for (const rel of data.relationships) {
         const u = rel.user;
