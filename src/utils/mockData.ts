@@ -1,19 +1,3 @@
-/**
- * Mock Discord ProcessedData Generator
- * Mirrors mock_discord_data.py — generates data matching the exact shape
- * returned by processZipData().
- *
- * Usage:
- *   import { generateMockDiscordData } from "./mockDiscordData";
- *   const data = generateMockDiscordData();
- *
- *   // With options:
- *   const data = generateMockDiscordData({ users: 200, channels: 30, dms: 50, servers: 8, seed: 42 });
- */
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
 
 export interface SelfUser {
   id: string;
@@ -108,9 +92,6 @@ export interface GeneratorOptions {
   seed?: number;
 }
 
-// ---------------------------------------------------------------------------
-// Seeded PRNG (mulberry32) — keeps output deterministic when seed is provided
-// ---------------------------------------------------------------------------
 
 function makePrng(seed: number) {
   let s = seed >>> 0;
@@ -122,7 +103,6 @@ function makePrng(seed: number) {
   };
 }
 
-// Module-level rand function — replaced on each generateMockDiscordData() call
 let rand: () => number = Math.random;
 
 function randInt(min: number, max: number): number {
@@ -155,10 +135,6 @@ function randSample<T>(arr: T[], n: number): T[] {
   }
   return copy.slice(0, n);
 }
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
 
 const DISCORD_EPOCH_MS = new Date("2015-05-13T00:00:00Z").getTime();
 
@@ -200,12 +176,7 @@ const CHANNEL_SUFFIXES = ["", "-chat", "-lounge", "-hub", "-zone", "-central", "
 const GUILD_TYPES = new Set<ChannelType>(["GUILD_TEXT", "PUBLIC_THREAD", "GUILD_VOICE"]);
 const DM_TYPES    = new Set<ChannelType>(["DM", "GROUP_DM"]);
 
-// ---------------------------------------------------------------------------
-// Primitive helpers
-// ---------------------------------------------------------------------------
-
 function md5like(): string {
-  // Not cryptographic — just a hex string that looks like a hash
   return Array.from({ length: 32 }, () =>
     Math.floor(rand() * 16).toString(16)
   ).join("");
@@ -217,7 +188,6 @@ function snowflake(): string {
   const worker    = randInt(0, 31);
   const process   = randInt(0, 31);
   const increment = randInt(0, 4095);
-  // JS bitwise ops are 32-bit — use BigInt for the shift
   const id = (BigInt(discordMs) << 22n) | (BigInt(worker) << 17n) | (BigInt(process) << 12n) | BigInt(increment);
   return id.toString();
 }
@@ -266,10 +236,6 @@ function makeServerName(): string {
   ];
   return randChoice(templates)();
 }
-
-// ---------------------------------------------------------------------------
-// Stats builders
-// ---------------------------------------------------------------------------
 
 function makeHourly(): Record<string, number> {
   const h: Record<string, number> = {};
@@ -371,11 +337,6 @@ function makeAggregateStats(channelStatsMap: Record<string, ChannelStats>): Aggr
     hourlySentimentAverage,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Main assembler
-// ---------------------------------------------------------------------------
-
 export function generateMockDiscordData(options: GeneratorOptions = {}): ProcessedData {
   const {
     users    = 300,
@@ -385,23 +346,19 @@ export function generateMockDiscordData(options: GeneratorOptions = {}): Process
     seed,
   } = options;
 
-  // Swap in seeded PRNG if requested
   rand = seed !== undefined ? makePrng(seed) : Math.random;
 
-  // IDs
   const allUserIds   = Array.from({ length: users },    snowflake);
   const guildChanIds = Array.from({ length: channels }, snowflake);
   const dmChanIds    = Array.from({ length: dms },      snowflake);
   const allChanIds   = [...guildChanIds, ...dmChanIds];
 
-  // self
   const selfObj: SelfUser = {
     id:          snowflake(),
     username:    makeUsername(),
     avatar_hash: md5like(),
   };
 
-  // channelMapping — force sensible types per bucket
   const channelMapping: Record<string, ChannelType> = {};
   for (const cid of guildChanIds) {
     channelMapping[cid] = randChoiceWeighted(
@@ -416,19 +373,16 @@ export function generateMockDiscordData(options: GeneratorOptions = {}): Process
     );
   }
 
-  // channelNaming — guild channels only
   const channelNaming: Record<string, string> = {};
   for (const cid of allChanIds) {
     if (GUILD_TYPES.has(channelMapping[cid])) channelNaming[cid] = makeChannelName();
   }
 
-  // userMapping
   const userMapping: Record<string, UserEntry> = {};
   for (const uid of allUserIds) {
     userMapping[uid] = { username: makeUsername(), avatar: md5like() };
   }
 
-  // serverMapping — guild channels only
   const serverIds = Array.from({ length: servers }, snowflake);
   const serverNames: Record<string, string> = {};
   for (const sid of serverIds) serverNames[sid] = makeServerName();
@@ -439,7 +393,6 @@ export function generateMockDiscordData(options: GeneratorOptions = {}): Process
   }
   const serverMapping: ServerMapping = { channelToServer, serverNames };
 
-  // channelStats + manifests
   const channelStats: Record<string, ChannelStats> = {};
   const channelManifest: string[] = [];
   const dmManifest: string[]      = [];
