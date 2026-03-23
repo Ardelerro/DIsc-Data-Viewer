@@ -2,18 +2,43 @@ import type JSZip from "jszip";
 import { calculateStreak } from "../utils/streakUtils";
 import { getTopWords, STOP_WORDS } from "../utils/textUtils";
 import Sentiment from "sentiment";
-import type { AggregateStats } from "../types/discord";
-import type { ChannelStats } from "../types/discord";
+import type { AggregateStats, ChannelStats } from "../types/discord";
 
 async function processMessages(
   zip: JSZip,
-  channelMapping: Record<string, string>,
   userMapping: Record<string, any>,
   yourId: string,
-  p0: (msgProgress: number) => void,
+  onProgress: (msgProgress: number) => void,
 ) {
   const sentiment = new Sentiment();
   const MESSAGE_GAP_THRESHOLD_S = 30 * 60;
+
+  // --- Pre-index all channel.json files in one pass ---
+  const channelJsonFiles = zip.file(/^Messages\/c\d+\/channel\.json$/i);
+  const channelDataMap = new Map<string, any>();
+  const channelMapping: Record<string, string> = {};
+  const channelNaming: Record<string, string> = {};
+
+  await Promise.all(
+    channelJsonFiles.map(async (f) => {
+      try {
+        const data = JSON.parse(await f.async("text"));
+        if (!data?.id) return;
+
+        let type: "DM" | "GROUP_DM" | "GUILD_TEXT" | "GUILD_VOICE" | "PUBLIC_THREAD" = "GUILD_TEXT";
+        if (data.type === "DM") type = "DM";
+        else if (data.type === "GROUP_DM") type = "GROUP_DM";
+        else if (data.type === 13) type = "PUBLIC_THREAD";
+        else if (data.type === "GUILD_VOICE") type = "GUILD_VOICE";
+
+        channelMapping[data.id] = type;
+        if (data.name) channelNaming[data.id] = data.name;
+        channelDataMap.set(data.id, data);
+      } catch {
+        // skip unreadable channel metadata
+      }
+    }),
+  );
 
   const aggregateStats: AggregateStats = {
     hourly: {},
@@ -28,19 +53,20 @@ async function processMessages(
     hourlySentimentTotal: {},
     hourlySentimentAverage: {},
   };
+
   const channelStats: Record<string, ChannelStats> = {};
   const dmManifest: string[] = [];
+  const channelManifest: string[] = [];
   const globalWordFreq: Record<string, number> = {};
-
   const globalHourlyAnalyzedCount: Record<string, number> = {};
   const deletedUserCountMap: Record<string, number> = {};
 
-  const messageFiles = zip.file(/^Messages\/c\d+\/messages\.json$/i) || [];
+  const messageFiles = zip.file(/^Messages\/c\d+\/messages\.json$/i) ?? [];
   const totalFiles = messageFiles.length;
   let processedFiles = 0;
 
   for (const messagesFile of messageFiles) {
-    p0(((++processedFiles / totalFiles) * 100) | 0);
+    onProgress(((++processedFiles / totalFiles) * 100) | 0);
 
     try {
       const channelIdMatch = messagesFile.name.match(/c(\d+)/);
@@ -63,25 +89,20 @@ async function processMessages(
         messageCount: 0,
         averageGapBetweenMessages: 0,
         averageConversationTime: 0,
+        firstMessageTimestamp: null,
       };
 
       const localWordFreq: Record<string, number> = {};
       const messageDates = new Set<string>();
       let prevMessageTime: number | null = null;
       let startTime: number | null = null;
-
       let analyzedCount = 0;
-
       const hourlyAnalyzedCount: Record<string, number> = {};
       const localHourlySentimentTotal: Record<string, number> = {};
 
       messages.sort((a: any, b: any) => {
-        const tA = a.Timestamp
-          ? new Date(a.Timestamp.replace(" ", "T")).getTime()
-          : 0;
-        const tB = b.Timestamp
-          ? new Date(b.Timestamp.replace(" ", "T")).getTime()
-          : 0;
+        const tA = a.Timestamp ? new Date(a.Timestamp.replace(" ", "T")).getTime() : 0;
+        const tB = b.Timestamp ? new Date(b.Timestamp.replace(" ", "T")).getTime() : 0;
         return tA - tB;
       });
 
@@ -97,8 +118,7 @@ async function processMessages(
         stats.hourly[hour] = (stats.hourly[hour] || 0) + 1;
         stats.monthly[month] = (stats.monthly[month] || 0) + 1;
         aggregateStats.hourly[hour] = (aggregateStats.hourly[hour] || 0) + 1;
-        aggregateStats.monthly[month] =
-          (aggregateStats.monthly[month] || 0) + 1;
+        aggregateStats.monthly[month] = (aggregateStats.monthly[month] || 0) + 1;
         stats.messageCount++;
         aggregateStats.messageCount++;
 
@@ -109,7 +129,6 @@ async function processMessages(
           if (gap > MESSAGE_GAP_THRESHOLD_S) {
             const conversationDuration = prevMessageTime - startTime;
             stats.totalConversationTime += conversationDuration;
-
             if (conversationDuration > stats.longestConversationTime) {
               stats.longestConversationTime = conversationDuration;
             }
@@ -122,7 +141,13 @@ async function processMessages(
         }
 
         prevMessageTime = currentTime;
-        messageDates.add(timestamp.toISOString().slice(0, 10));
+        const dateStr = timestamp.toISOString().slice(0, 10);
+        messageDates.add(dateStr);
+
+        // Capture first message timestamp from the earliest sorted message
+        if (stats.firstMessageTimestamp === null) {
+          stats.firstMessageTimestamp = timestamp.toISOString();
+        }
 
         if (msg.Contents) {
           const result = sentiment.analyze(msg.Contents);
@@ -135,7 +160,6 @@ async function processMessages(
 
           aggregateStats.hourlySentimentTotal[hour] =
             (aggregateStats.hourlySentimentTotal[hour] || 0) + result.score;
-
           localHourlySentimentTotal[hour] =
             (localHourlySentimentTotal[hour] || 0) + result.score;
           hourlyAnalyzedCount[hour] = (hourlyAnalyzedCount[hour] || 0) + 1;
@@ -154,6 +178,7 @@ async function processMessages(
         }
       }
 
+      // Final conversation segment
       if (startTime !== null && prevMessageTime !== null) {
         const conversationDuration = prevMessageTime - startTime;
         stats.totalConversationTime += conversationDuration;
@@ -162,9 +187,7 @@ async function processMessages(
         }
       }
 
-      if (analyzedCount > 0) {
-        stats.sentiment.average /= analyzedCount;
-      }
+      if (analyzedCount > 0) stats.sentiment.average /= analyzedCount;
       stats.averageGapBetweenMessages =
         stats.numGaps > 0 ? stats.totalGapTime / stats.numGaps : 0;
       stats.averageConversationTime =
@@ -176,30 +199,22 @@ async function processMessages(
       for (const hour in stats.hourly) {
         const analyzed = hourlyAnalyzedCount[hour] || 0;
         const total = localHourlySentimentTotal[hour] || 0;
-        channelHourlySentimentAverage[hour] =
-          analyzed > 0 ? total / analyzed : 0;
+        channelHourlySentimentAverage[hour] = analyzed > 0 ? total / analyzed : 0;
       }
+      stats.hourlySentimentAverage = channelHourlySentimentAverage;
 
-      const topWords = getTopWords(localWordFreq, 50);
+      stats.topWords = getTopWords(localWordFreq, 50);
       const streak = calculateStreak(messageDates);
-
-      const channelFile = zip.file(
-        new RegExp(`^Messages/c${channelId}/channel\\.json$`, "i"),
-      )?.[0];
-      if (!channelFile) continue;
-
-      const channelData = JSON.parse(await channelFile.async("text"));
-
-      stats.topWords = topWords;
       stats.longestStreak = streak.length;
       stats.streakStart = streak.start;
       stats.streakEnd = streak.end;
-      stats.hourlySentimentAverage = channelHourlySentimentAverage;
+
+      const channelData = channelDataMap.get(channelId);
+      if (!channelData) continue;
 
       if (channelType === "DM") {
         const recipientId =
-          channelData.recipients?.find((r: string) => r !== yourId) ??
-          "unknown";
+          channelData.recipients?.find((r: string) => r !== yourId) ?? "unknown";
 
         let recipientName =
           userMapping[recipientId]?.username ?? `Unknown (${recipientId})`;
@@ -211,8 +226,6 @@ async function processMessages(
         }
 
         stats.recipientName = recipientName;
-        stats.firstMessageTimestamp =
-          messageDates.values().next().value ?? null;
         channelStats[`dm_${channelId}`] = stats;
         dmManifest.push(`dm_${channelId}.json`);
       } else {
@@ -222,12 +235,10 @@ async function processMessages(
             ? `Group DM (${channelId})`
             : `Unnamed Channel (${channelId})`);
         channelStats[`channel_${channelId}`] = stats;
+        channelManifest.push(`channel_${channelId}.json`);
       }
     } catch (err) {
-      console.warn(
-        `Failed processing messages for file: ${messagesFile.name}`,
-        err,
-      );
+      console.warn(`Failed processing messages for file: ${messagesFile.name}`, err);
     }
   }
 
@@ -244,7 +255,14 @@ async function processMessages(
       analyzed > 0 ? total / analyzed : 0;
   }
 
-  return { aggregateStats, channelStats, dmManifest };
+  return {
+    aggregateStats,
+    channelStats,
+    channelMapping,
+    channelNaming,
+    channelManifest,
+    dmManifest,
+  };
 }
 
 export { processMessages };
