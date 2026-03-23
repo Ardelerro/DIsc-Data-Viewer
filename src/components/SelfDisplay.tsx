@@ -24,6 +24,7 @@ import { TIER_STYLES } from "../types/styles";
 import type { AchievementTier } from "../types/types";
 import PersonalityBadge from "../achievements/PersonalityBadge";
 import StaggeredStatGrid from "./StaggeredStatGrid";
+import Avatar from "./Avatar";
 
 const SelfDisplay: FC = () => {
   const { data } = useData();
@@ -85,16 +86,6 @@ const SelfDisplay: FC = () => {
     );
   }
 
-  const avatarUrl = (u: typeof self) => {
-    if (u?.id && u.avatar_hash) {
-      return `https://cdn.discordapp.com/avatars/${u.id}/${u.avatar_hash}.png?size=128`;
-    }
-    if (u?.id) {
-      return `https://cdn.discordapp.com/embed/avatars/${Number(u.id) % 5}.png`;
-    }
-    return "https://cdn.discordapp.com/embed/avatars/0.png";
-  };
-
   const totalMessages = aggregateStats?.messageCount ?? 0;
   const totalChannels = Object.keys(channelStats).length;
   let minDate = Infinity;
@@ -151,19 +142,20 @@ const SelfDisplay: FC = () => {
           transition={{ type: "spring", stiffness: 300 }}
         >
           <div className="w-full h-full rounded-full bg-white dark:bg-slate-800 p-[2px]">
-            <img
-              src={avatarUrl(self)}
-              alt={`${self.username}'s avatar`}
+            <Avatar
+              userId={self.id}
+              avatarHash={self.avatar_hash}
               className="w-full h-full rounded-full object-cover"
             />
           </div>
         </motion.div>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-1">
+        <div className="flex-1 min-w-0 text-center sm:text-left">
+          <div className="flex flex-col sm:flex-row items-center sm:items-center justify-center sm:justify-start gap-2 sm:gap-3 mb-1">
             <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100 truncate">
               {self.username}
             </h2>
+
             {personality && (
               <PersonalityBadge
                 icon={personality.icon}
@@ -173,6 +165,7 @@ const SelfDisplay: FC = () => {
               />
             )}
           </div>
+
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
             {personality?.tagline ?? "Your overall activity overview"}
           </p>
@@ -276,7 +269,7 @@ const SelfDisplay: FC = () => {
               </div>
             )}
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
               {displayAchs.map((ach, i) => (
                 <AchievementBubble
                   key={ach.id}
