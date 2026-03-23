@@ -5,6 +5,7 @@ import React from "react";
 import TopDisplay from "./TopDisplay";
 import MarqueeText from "../text/MarqueeText";
 import type { StreakStats } from "../../types/discord";
+import Avatar from "../Avatar";
 
 const TopStreaks: FC<{ className?: string }> = ({ className = "" }) => {
   const { data } = useData();
@@ -17,45 +18,45 @@ const TopStreaks: FC<{ className?: string }> = ({ className = "" }) => {
       const longestStreak = stats.longestStreak ?? 0;
       if (longestStreak <= 0) continue;
       const channelId = key.replace(/^dm_|\.json$/g, "");
-      const userId = Object.entries(data.userMapping || {}).find(
-        ([, info]) => info.username === stats.recipientName
-      )?.[0];
-      const avatar = userId ? data.userMapping?.[userId]?.avatar : undefined;
+      const userEntry = Object.entries(data.userMapping || {}).find(
+        ([, info]) => info.username === stats.recipientName,
+      );
+      const userId = userEntry?.[0];
+      const avatar = userId ? data.userMapping?.[userId]?.avatar || undefined : undefined;
       results.push({
-        channelId, userId, name: stats.recipientName, avatar, longestStreak,
+        channelId,
+        userId,
+        name: stats.recipientName,
+        avatar,
+        longestStreak,
         streakStart: stats.streakStart ?? "",
         streakEnd: stats.streakEnd ?? "",
       });
     }
     return results
-      .sort((a, b) =>
-        b.longestStreak - a.longestStreak ||
-        new Date(b.streakEnd).getTime() - new Date(a.streakEnd).getTime()
+      .sort(
+        (a, b) =>
+          b.longestStreak - a.longestStreak ||
+          new Date(b.streakEnd).getTime() - new Date(a.streakEnd).getTime(),
       )
       .slice(0, 10);
   }, [data]);
-
-  const avatarUrl = (u: StreakStats) => {
-    if (u.userId && u.avatar)
-      return `https://cdn.discordapp.com/avatars/${u.userId}/${u.avatar}.png?size=128`;
-    if (u.userId)
-      return `https://cdn.discordapp.com/embed/avatars/${Number(u.userId) % 5}.png`;
-    return "https://cdn.discordapp.com/embed/avatars/0.png";
-  };
 
   const rows = streakStats.map((s, i) => (
     <tr
       key={s.channelId}
       className="even:bg-slate-50 dark:even:bg-slate-700/30 hover:bg-indigo-50 dark:hover:bg-slate-700/50 transition-colors"
     >
-      <td className="px-4 py-3 font-semibold text-lg whitespace-nowrap">#{i + 1}</td>
+      <td className="px-4 py-3 font-semibold text-lg whitespace-nowrap">
+        #{i + 1}
+      </td>
       <td className="px-4 py-3 overflow-hidden min-w-0">
         <div className="flex items-center gap-3 min-w-0">
-          <img
-            src={avatarUrl(s)}
-            alt={`${s.name}'s avatar`}
+          <Avatar
+            userId={s.userId}
+            avatarHash={s.avatar}
+            username={s.name}
             className="w-10 h-10 rounded-full shrink-0"
-            loading="lazy"
           />
           <div className="min-w-0 flex-1 overflow-hidden">
             <MarqueeText text={s.name} rotation="hover" className="text-base" />

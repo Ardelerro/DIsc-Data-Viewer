@@ -3,6 +3,7 @@ import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { useData } from "../context/DataContext";
 import { useNavigate } from "react-router-dom";
+import { generateMockDiscordData } from "../utils/mockData";
 const UploadPage: FC = () => {
   const { uploadData, isLoading } = useData();
 
@@ -83,7 +84,7 @@ const UploadPage: FC = () => {
   };
 
   const handlePrecomputedUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>
+    e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = e.target.files?.[0];
     if (!file || !file.name.endsWith(".json")) {
@@ -217,6 +218,23 @@ const UploadPage: FC = () => {
                 </label>
               </>
             )}
+            <div className="col-span-1 md:col-span-2">
+              <button
+                onClick={() => {
+                  
+                  const mock = generateMockDiscordData();
+
+                  localStorage.setItem(
+                    "discord-processed-data",
+                    JSON.stringify(mock),
+                  );
+                  window.location.replace("/");
+                }}
+                className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium transition-all shadow-md hover:shadow-lg active:scale-[0.98]"
+              >
+                Use Mock Data
+              </button>
+            </div>
           </div>
 
           {isLoading && (
