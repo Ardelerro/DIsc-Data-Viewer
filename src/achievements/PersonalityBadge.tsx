@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import { type FC, useState } from "react";
+import { PERSONALITY, TOOLTIP } from "../config/theme";
 
 const PersonalityBadge: FC<{
   icon: LucideIcon;
@@ -19,12 +20,10 @@ const PersonalityBadge: FC<{
       <motion.div
         whileHover={{ scale: 1.04 }}
         transition={{ type: "spring", stiffness: 300, damping: 20 }}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 cursor-default select-none"
+        className={PERSONALITY.badge}
       >
         <Icon className={`w-4 h-4 ${iconColor}`} />
-        <span className="text-xs font-semibold text-indigo-700 dark:text-indigo-300 whitespace-nowrap">
-          {name}
-        </span>
+        <span className={PERSONALITY.text}>{name}</span>
       </motion.div>
 
       <AnimatePresence>
@@ -37,7 +36,7 @@ const PersonalityBadge: FC<{
             className="absolute bottom-full right-0 mb-2 z-50 pointer-events-none"
             style={{ minWidth: 200, maxWidth: 260 }}
           >
-            <div className="bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-xl px-3 py-2.5 shadow-xl">
+            <div className={TOOLTIP.panel}>
               <p className="text-xs font-semibold mb-2 opacity-50 uppercase tracking-wide">
                 Why you got this
               </p>
@@ -51,7 +50,7 @@ const PersonalityBadge: FC<{
               </ul>
             </div>
             <div className="flex justify-end pr-4">
-              <div className="w-2 h-2 bg-slate-900 dark:bg-slate-100 rotate-45 -mt-1" />
+              <div className={TOOLTIP.arrow} />
             </div>
           </motion.div>
         )}
