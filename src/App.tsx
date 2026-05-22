@@ -1,6 +1,6 @@
 import { BrowserRouter as Router} from "react-router-dom";
 import { DataProvider } from "./context/DataContext";
-import AppWrapper from "./utils/AppWrapper";
+import AppWrapper from "./components/AppWrapper";
 
 function App() {
   return (
