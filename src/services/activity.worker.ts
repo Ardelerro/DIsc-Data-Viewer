@@ -1,5 +1,11 @@
-let leftoverText = "";
-const decoder = new TextDecoder("utf-8", { fatal: false });
+import {
+  BlobReader,
+  ZipReader,
+  configure,
+  type FileEntry,
+} from "@zip.js/zip.js";
+
+configure({ useWebWorkers: false });
 
 const patterns = {
   addReaction: "add_reaction",
@@ -8,9 +14,11 @@ const patterns = {
   startCall: "start_call",
   joinCall: "join_call",
   appOpened: "app_opened",
-};
+} as const;
 
-const counters = {
+type CounterKey = keyof typeof patterns;
+
+const counters: Record<CounterKey, number> = {
   addReaction: 0,
   attachmentsSent: 0,
   joinVoice: 0,
@@ -19,81 +27,89 @@ const counters = {
   appOpened: 0,
 };
 
-const patternToCounterKey = Object.entries(patterns).reduce(
-  (acc, [key, value]) => {
-    acc[value] = key as keyof typeof counters;
-    return acc;
-  },
-  {} as { [key: string]: keyof typeof counters }
+// Longest pattern: a match can span at most this many characters, so carrying
+// the last (max - 1) characters between chunks is enough to catch any pattern
+// straddling a chunk boundary — no dependency on the file being newline-delimited.
+const MAX_PATTERN_LEN = Math.max(
+  ...Object.values(patterns).map((p) => p.length),
 );
+const OVERLAP = MAX_PATTERN_LEN - 1;
 
-const patternsRegex = new RegExp(Object.values(patterns).join("|"));
+const post = (msg: unknown) => (postMessage as (m: unknown) => void)(msg);
 
-let processedBytes = 0;
-let totalBytes = 1;
-let lastProgress = 0;
+self.onmessage = async (ev: MessageEvent<{ type: "process"; file: File | Blob }>) => {
+  const req = ev.data;
+  if (!req || req.type !== "process") return;
 
-function processLine(line: string) {
-  if (line.length < 9) return;
-  const match = patternsRegex.exec(line);
-  if (match) {
-    const key = patternToCounterKey[match[0]];
-    if (key) counters[key]++;
-  }
-}
+  const reader = new ZipReader(new BlobReader(req.file));
+  const entries = await reader.getEntries();
 
-function processChunk(chunk: Uint8Array) {
-  const text = decoder.decode(chunk, { stream: true });
+  const fileEntries = entries.filter((e) => !e.directory) as FileEntry[];
+  const activityEntry: FileEntry | undefined =
+    fileEntries.find((e) => /Activity\/Analytics\/[^/]+\.json$/i.test(e.filename)) ||
+    fileEntries.find((e) => /Account\/activity\.json$/i.test(e.filename));
 
-  const fullText = leftoverText + text;
-
-  const lastNewlineIndex = fullText.lastIndexOf("\n");
-
-  if (lastNewlineIndex === -1) {
-    leftoverText = fullText;
+  if (!activityEntry) {
+    await reader.close();
+    post({ type: "complete", data: { ...counters } });
     return;
   }
 
-  const processableText = fullText.slice(0, lastNewlineIndex);
-  leftoverText = fullText.slice(lastNewlineIndex + 1);
+  const totalBytes = activityEntry.uncompressedSize || 1;
+  let processedBytes = 0;
+  let lastProgress = 0;
 
+  const decoder = new TextDecoder("utf-8", { fatal: false });
+  // Tail of the previous chunk whose start positions haven't been counted yet;
+  // never longer than OVERLAP characters.
+  let leftover = "";
 
-  let start = 0;
-  let newlineIndex;
-  while ((newlineIndex = processableText.indexOf('\n', start)) !== -1) {
-    const line = processableText.slice(start, newlineIndex);
-    processLine(line);
-    start = newlineIndex + 1;
+  function countUpTo(text: string, limit: number) {
+    for (const key in patterns) {
+      const pat = patterns[key as CounterKey];
+      let idx = 0;
+      let n = 0;
+      while ((idx = text.indexOf(pat, idx)) !== -1 && idx < limit) {
+        n++;
+        idx += pat.length;
+      }
+      counters[key as CounterKey] += n;
+    }
   }
 
-  processedBytes += chunk.byteLength;
-  const progress = Math.min(100, (processedBytes / totalBytes) * 100);
-  if (progress - lastProgress > 1 || processedBytes === totalBytes) {
-    lastProgress = progress;
-    postMessage({ type: "progress", data: progress });
-  }
-}
-
-function finalize() {
-  const finalDecoded = decoder.decode(undefined, { stream: false });
-  const finalText = leftoverText + finalDecoded;
-
-  if (finalText.length > 0) {
-    processLine(finalText);
+  function processChunk(chunk: Uint8Array) {
+    const combined = leftover + decoder.decode(chunk, { stream: true });
+    const limit = combined.length - OVERLAP;
+    if (limit > 0) {
+      countUpTo(combined, limit);
+      leftover = combined.slice(limit);
+    } else {
+      leftover = combined;
+    }
   }
 
-  postMessage({ type: "complete", data: counters });
-  close();
-}
+  const writable = new WritableStream<Uint8Array>({
+    write(chunk) {
+      processChunk(chunk);
+      processedBytes += chunk.byteLength;
+      const progress = Math.min(100, (processedBytes / totalBytes) * 100);
+      if (progress - lastProgress > 1 || processedBytes >= totalBytes) {
+        lastProgress = progress;
+        post({ type: "progress", data: progress });
+      }
+    },
+    close() {
+      const tail = leftover + decoder.decode();
+      if (tail.length > 0) countUpTo(tail, tail.length);
+    },
+  });
 
-self.onmessage = (event) => {
-  const { type } = event.data;
-
-  if (type === "init") {
-    totalBytes = event.data.totalBytes;
-  } else if (type === "chunk") {
-    processChunk(event.data.chunk);
-  } else if (type === "close") {
-    finalize();
+  try {
+    await activityEntry.getData(writable);
+  } catch (err) {
+    console.error("Activity stream error", err);
   }
+
+  await reader.close();
+  post({ type: "complete", data: { ...counters } });
 };
