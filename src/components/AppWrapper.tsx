@@ -3,7 +3,7 @@ import { useLocation, Routes, Route } from "react-router-dom";
 import ErrorPage from "../pages/ErrorPage";
 import ServerSearchPage from "../pages/SearchServer";
 import UploadPage from "../pages/UploadPage";
-import PageWrapper from "./PageWrapper";
+import PageWrapper from "../utils/PageWrapper";
 import Home from "../pages/Home";
 import Search from "../pages/Search";
 
