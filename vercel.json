@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/discord-cdn/(.*)", "destination": "https://cdn.discordapp.com/$1" }
+  ]
+}
