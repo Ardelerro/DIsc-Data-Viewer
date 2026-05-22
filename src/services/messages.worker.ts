@@ -99,8 +99,6 @@ interface ChannelAcc {
   sentPos: number;
   sentNeg: number;
   sentNeu: number;
-  // sentAvgSum: Σ(score × length-weight); sentWeightSum: Σ(length-weight).
-  // Channel average = sentAvgSum / sentWeightSum — a length-weighted mean.
   sentAvgSum: number;
   sentWeightSum: number;
   messageCount: number;
@@ -167,13 +165,10 @@ async function processFile(filename: string) {
   } catch (err) {
     console.warn(`Failed to process ${filename}`, err);
   } finally {
-    // Always report the file's full byte weight (even on skip/error) so the
-    // main-thread progress total reliably reaches 100%.
     if (size > reported) reportDelta(size - reported);
   }
 }
 
-// Small file: decompress fully and hand the whole array to native JSON.parse.
 async function parseWhole(entry: FileEntry, acc: ChannelAcc) {
   let messages: unknown;
   try {
@@ -190,9 +185,6 @@ async function parseWhole(entry: FileEntry, acc: ChannelAcc) {
   }
 }
 
-// Large file: stream decompressed bytes and extract each top-level {...} object
-// as a complete substring, parsing one message at a time. Only a single object
-// is buffered, so memory stays bounded regardless of file size.
 async function streamFile(
   entry: FileEntry,
   acc: ChannelAcc,
