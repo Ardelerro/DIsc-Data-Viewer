@@ -3,14 +3,15 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useState, useMemo, useCallback, lazy } from "react";
 import { useData } from "../context/DataContext";
-import TopUsers from "../components/topDisplays/TopUsers";
-import TopChannels from "../components/topDisplays/TopChannels";
-import TopServers from "../components/topDisplays/TopServers";
-import TopStreaks from "../components/topDisplays/TopStreaks";
-import SelfDisplay from "../components/SelfDisplay";
+import TopUsers from "../components/displays/topDisplays/TopUsers";
+import TopChannels from "../components/displays/topDisplays/TopChannels";
+import TopServers from "../components/displays/topDisplays/TopServers";
+import TopStreaks from "../components/displays/topDisplays/TopStreaks";
+import { type DateRange, filterMonthly } from "../utils/timeFilterUtils";
+import SelfDisplay from "../components/displays/SelfDisplay";
 const HourlyChart = lazy(() => import("../components/charts/HourlyChart"));
 const HourlyMoodChart = lazy(() => import("../components/charts/HourlyMoodChart"));
-import SettingsModal from "../components/SettingsModal";
+import SettingsModal from "../components/displays/SettingsDisplay";
 import type { ShowElementsState } from "../types/types";
 const MonthlyChart = lazy(() => import("../components/charts/MonthlyChart"));
 import { createPortal } from "react-dom";
@@ -22,12 +23,15 @@ import {
   Moon,
   MenuIcon,
   Share2Icon,
+  ArrowRight,
 } from "lucide-react";
-import WrappedCarousel from "../components/WrappedCarousel";
+import WrappedCarousel from "../components/displays/WrappedDisplay";
 import type { WrappedCardData } from "../types/discord";
+import { ICON_BTN } from "../config/theme";
+import TimeRangeSelector from "../components/forms/TimeRangeSelector";
 
 const Home: FC = () => {
-  const { data, clearData } = useData();
+  const { data, clearData, hydrating } = useData();
   const [showSettings, setShowSettings] = useState(false);
   const [showElements, setShowElements] = useState<ShowElementsState>({
     topUsers: true,
@@ -43,6 +47,14 @@ const Home: FC = () => {
     document.documentElement.classList.contains("dark") ? "dark" : "light",
   );
   const [showWrapped, setShowWrapped] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRange | null>(null);
+  const hasDaily = !!(data?.aggregateStats?.daily && Object.keys(data.aggregateStats.daily).length > 0);
+  const lastDataDate = useMemo(() => {
+    if (!data?.aggregateStats?.daily) return undefined;
+    const keys = Object.keys(data.aggregateStats.daily);
+    const sorted = [...keys].sort();
+    return sorted.length > 0 ? sorted[sorted.length - 1] : undefined;
+  }, [data]);
 
   const toggleTheme = useCallback(() => {
     setTheme((prev) => {
@@ -50,10 +62,8 @@ const Home: FC = () => {
       localStorage.setItem("theme", t);
       if (t === "dark") {
         document.documentElement.classList.add("dark");
-        setTheme("dark");
       } else {
         document.documentElement.classList.remove("dark");
-        setTheme("light");
       }
       return t;
     });
@@ -71,60 +81,41 @@ const Home: FC = () => {
     a.click();
     URL.revokeObjectURL(url);
   }, [data]);
+
   const [fabOnLeft, setFabOnLeft] = useState(false);
 
   const memoizedHourly = useMemo(() => data?.aggregateStats.hourly, [data]);
   const memoizedMonthly = useMemo(() => data?.aggregateStats.monthly, [data]);
+  const filteredMonthly = useMemo(
+    () => (memoizedMonthly ? filterMonthly(memoizedMonthly, dateRange) : {}),
+    [memoizedMonthly, dateRange],
+  );
+
   const wrappedData = useMemo<WrappedCardData | null>(() => {
     if (!data) return null;
 
     const topUsers: { username: string; messageCount: number }[] = [];
-
     for (const [key, stats] of Object.entries(data.channelStats)) {
       if (!stats.recipientName || !key.startsWith("dm_")) continue;
-      const totalMessages = Object.values(stats.hourly || {}).reduce(
-        (a, b) => a + b,
-        0,
-      );
-      //console.log(key, stats.recipientName, totalMessages);
-
-      topUsers.push({
-        username: stats.recipientName,
-        messageCount: totalMessages,
-      });
+      const totalMessages = Object.values(stats.hourly || {}).reduce((a, b) => a + b, 0);
+      topUsers.push({ username: stats.recipientName, messageCount: totalMessages });
     }
     topUsers.sort((a, b) => b.messageCount - a.messageCount);
-    const serverStats: WrappedCardData["serverStats"] = {};
 
+    const serverStats: WrappedCardData["serverStats"] = {};
     for (const [key, stats] of Object.entries(data.channelStats)) {
       if (!key.startsWith("channel_")) continue;
-
       const channelId = key.replace(/^channel_/, "");
-
-      const total = Object.values(stats.hourly || {}).reduce(
-        (sum, val) => sum + (val ?? 0),
-        0,
-      );
-
+      const total = Object.values(stats.hourly || {}).reduce((sum, val) => sum + (val ?? 0), 0);
       const type = data.channelMapping[channelId];
-
-      if (!["GUILD_TEXT", "PUBLIC_THREAD", "GUILD_VOICE"].includes(type)) {
-        continue;
-      }
-
-      const serverId =
-        data.serverMapping.channelToServer[channelId] ??
-        `unknown (${channelId})`;
-
+      if (!["GUILD_TEXT", "PUBLIC_THREAD", "GUILD_VOICE"].includes(type)) continue;
+      const serverId = data.serverMapping.channelToServer[channelId] ?? `unknown (${channelId})`;
       if (!serverStats[serverId]) {
         serverStats[serverId] = {
-          name:
-            data.serverMapping.serverNames[serverId] ??
-            `Unknown Server (${serverId})`,
+          name: data.serverMapping.serverNames[serverId] ?? `Unknown Server (${serverId})`,
           messageCount: 0,
         };
       }
-
       serverStats[serverId].messageCount += total;
     }
 
@@ -139,11 +130,7 @@ const Home: FC = () => {
       channelStats: Object.fromEntries(
         Object.entries(data.channelStats).map(([id, ch]) => [
           id,
-          {
-            monthly: ch.monthly,
-            hourly: ch.hourly,
-            name: data.channelNaming[id],
-          },
+          { monthly: ch.monthly, hourly: ch.hourly, daily: ch.daily, name: data.channelNaming[id] },
         ]),
       ),
       activityStats: data.activityStats,
@@ -151,18 +138,29 @@ const Home: FC = () => {
       serverStats,
     };
   }, [data]);
+
+  const iconBtn = ICON_BTN;
+
+  if (hydrating) {
+    return (
+      <div className="min-h-screen w-full bg-[var(--color-bg)] flex items-center justify-center">
+        <div className="h-8 w-8 rounded-full border-2 border-[var(--color-border-solid)] border-t-[var(--color-accent)] animate-spin" />
+      </div>
+    );
+  }
+
   if (!data) {
     return (
-      <div className="min-h-screen w-full flex flex-col items-center justify-center px-6 sm:px-8 text-center bg-gradient-to-br from-indigo-50 via-white to-teal-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950/30">
-        <h1 className="text-3xl sm:text-4xl font-bold mb-4 text-slate-900 dark:text-white">
-          Discord Stats Dashboard
+      <div className="min-h-screen w-full flex flex-col items-center justify-center px-6 text-center bg-[var(--color-bg)]">
+        <h1 className="text-xl font-semibold mb-2 text-[var(--color-text-1)]">
+          Discord Stats
         </h1>
-        <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 mb-6">
+        <p className="text-sm text-[var(--color-text-3)] mb-6">
           Upload your Discord data package to get started
         </p>
         <Link
           to="/upload"
-          className="inline-block px-6 sm:px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors"
+          className="inline-block px-5 py-2 bg-[var(--color-accent)] hover:opacity-90 text-white text-sm font-medium rounded-lg transition-opacity duration-150"
         >
           Upload Data Package
         </Link>
@@ -171,110 +169,90 @@ const Home: FC = () => {
   }
 
   return (
-    <div className="relative min-h-screen w-full bg-gradient-to-br from-indigo-50 via-white to-teal-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950/30 overflow-x-hidden">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-6 mb-8">
+    <div className="relative min-h-screen w-full bg-[var(--color-bg)] overflow-x-hidden">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-8">
+
+        {/* ─── Header ─────────────────────────────────────────────── */}
+        <div className="flex items-center justify-between pb-4 mb-6 border-b border-[var(--color-border)]">
           <div>
-            <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white mb-2">
-              Discord Stats Dashboard
+            <h1 className="text-base font-semibold tracking-tight text-[var(--color-text-1)]">
+              Discord Stats
             </h1>
-            <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300">
-              Welcome back, {data.self.username}!
+            <p className="text-xs text-[var(--color-text-3)] mt-0.5">
+              {data.self.username}
             </p>
           </div>
 
-          <div className="hidden sm:flex items-center gap-4">
-            <div
-              onClick={() => setShowSettings(true)}
-              className="cursor-pointer"
-            >
-              <Settings className="w-6 h-6 stroke-indigo-500 hover:stroke-indigo-600 dark:stroke-indigo-300 dark:hover:stroke-indigo-200 transition-colors" />
-            </div>
-            <div
-              onClick={() => setShowConfirmDelete(true)}
-              className="cursor-pointer"
-            >
-              <Trash2 className="w-6 h-6 stroke-red-500 hover:stroke-red-600 dark:stroke-red-300 dark:hover:stroke-red-200 transition-colors" />
-            </div>
-            <div onClick={handleDownloadData} className="cursor-pointer">
-              <Download className="w-6 h-6 stroke-emerald-500 hover:stroke-emerald-600 dark:stroke-emerald-300 dark:hover:stroke-emerald-200 transition-colors" />
-            </div>
-            <div
-              className="cursor-pointer"
-              onClick={() => setShowWrapped(true)}
-            >
-              <Share2Icon className="w-6 h-6 stroke-slate-600 hover:stroke-slate-700 dark:stroke-slate-300 dark:hover:stroke-slate-200 transition-colors" />
-            </div>
-            <div
-              onClick={toggleTheme}
-              className="relative w-6 h-6 cursor-pointer"
-            >
-              <motion.div
+          <div className="hidden sm:flex items-center gap-0.5">
+            <button onClick={() => setShowSettings(true)} className={iconBtn} title="Settings">
+              <Settings className="[var(--icon-size)]" />
+            </button>
+            <button onClick={() => setShowConfirmDelete(true)} className={iconBtn} title="Delete data">
+              <Trash2 className="[var(--icon-size)]" />
+            </button>
+            <button onClick={handleDownloadData} className={iconBtn} title="Download data">
+              <Download className="[var(--icon-size)]" />
+            </button>
+            <button onClick={() => setShowWrapped(true)} className={iconBtn} title="Share Wrapped">
+              <Share2Icon className="[var(--icon-size)]" />
+            </button>
+            <button onClick={toggleTheme} className={`${iconBtn} relative w-8 h-8`} title="Toggle theme">
+              <motion.span
                 className="absolute inset-0 flex items-center justify-center"
-                animate={{
-                  rotate: theme === "dark" ? 0 : 90,
-                  scale: theme === "dark" ? 1 : 0,
-                  opacity: theme === "dark" ? 1 : 0,
-                }}
-                transition={{ duration: 0.35, ease: "easeInOut" }}
+                animate={{ rotate: theme === "dark" ? 0 : 90, scale: theme === "dark" ? 1 : 0, opacity: theme === "dark" ? 1 : 0 }}
+                transition={{ duration: 0.2, ease: "easeInOut" }}
               >
-                <Sun className="w-6 h-6 stroke-slate-600 dark:stroke-slate-200" />
-              </motion.div>
-
-              <motion.div
+                <Sun className="[var(--icon-size)]" />
+              </motion.span>
+              <motion.span
                 className="absolute inset-0 flex items-center justify-center"
-                animate={{
-                  rotate: theme === "light" ? 0 : -90,
-                  scale: theme === "light" ? 1 : 0,
-                  opacity: theme === "light" ? 1 : 0,
-                }}
-                transition={{ duration: 0.35, ease: "easeInOut" }}
+                animate={{ rotate: theme === "light" ? 0 : -90, scale: theme === "light" ? 1 : 0, opacity: theme === "light" ? 1 : 0 }}
+                transition={{ duration: 0.2, ease: "easeInOut" }}
               >
-                <Moon className="w-6 h-6 stroke-slate-600 dark:stroke-slate-200" />
-              </motion.div>
-            </div>
+                <Moon className="[var(--icon-size)]" />
+              </motion.span>
+            </button>
           </div>
         </div>
 
-        <div className="mb-8">
+        {/* ─── Profile ────────────────────────────────────────────── */}
+        <div className="mb-5">
           <SelfDisplay />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+        {/* ─── Navigation cards ───────────────────────────────────── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
           <Link to="/search">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="p-5 sm:p-6 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg hover:shadow-xl transition-all cursor-pointer"
-            >
-              <h3 className="text-lg sm:text-xl font-bold mb-1 sm:mb-2">
-                Search DMs by User
-              </h3>
-              <p className="text-purple-100 text-sm sm:text-base">
-                View detailed stats for specific users
-              </p>
-            </motion.div>
+            <div className="group flex items-center justify-between p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-raised)] transition-all duration-150 cursor-pointer">
+              <div>
+                <h3 className="text-sm font-medium text-[var(--color-text-1)]">
+                  Search DMs
+                </h3>
+                <p className="text-xs text-[var(--color-text-3)] mt-0.5">
+                  View stats for specific users
+                </p>
+              </div>
+              <ArrowRight className="w-4 h-4 text-[var(--color-text-3)] group-hover:text-[var(--color-accent)] transition-colors duration-150 shrink-0" />
+            </div>
           </Link>
 
           <Link to="/server-search">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="p-5 sm:p-6 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 text-white shadow-lg hover:shadow-xl transition-all cursor-pointer"
-            >
-              <h3 className="text-lg sm:text-xl font-bold mb-1 sm:mb-2">
-                Search by Server
-              </h3>
-              <p className="text-blue-100 text-sm sm:text-base">
-                Explore server-specific analytics
-              </p>
-            </motion.div>
+            <div className="group flex items-center justify-between p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-raised)] transition-all duration-150 cursor-pointer">
+              <div>
+                <h3 className="text-sm font-medium text-[var(--color-text-1)]">
+                  Search by Server
+                </h3>
+                <p className="text-xs text-[var(--color-text-3)] mt-0.5">
+                  Explore server-specific analytics
+                </p>
+              </div>
+              <ArrowRight className="w-4 h-4 text-[var(--color-text-3)] group-hover:text-[var(--color-accent)] transition-colors duration-150 shrink-0" />
+            </div>
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* ─── Charts & tables ────────────────────────────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {showElements.moodChart && (
             <HourlyMoodChart className="col-span-1 lg:col-span-2" />
           )}
@@ -284,174 +262,124 @@ const Home: FC = () => {
               className="col-span-1 lg:col-span-2"
             />
           )}
+          <div className="col-span-1 lg:col-span-2 flex flex-wrap items-center gap-3 px-0.5 mt-2">
+            <TimeRangeSelector hasDaily={hasDaily} anchorDate={lastDataDate} onChange={setDateRange} />
+          </div>
           {showElements.monthlyCharts && (
             <MonthlyChart
-              data={memoizedMonthly!}
+              data={filteredMonthly}
               className="col-span-1 lg:col-span-2"
             />
           )}
-          {showElements.topUsers && <TopUsers />}
-          {showElements.topStreaks && <TopStreaks />}
-          {showElements.topChannels && <TopChannels />}
-          {showElements.topServers && <TopServers />}
+          {showElements.topUsers && <TopUsers dateRange={dateRange} />}
+          {showElements.topStreaks && <TopStreaks dateRange={dateRange} />}
+          {showElements.topChannels && <TopChannels dateRange={dateRange} />}
+          {showElements.topServers && <TopServers dateRange={dateRange} />}
         </div>
       </div>
 
+      {/* ─── Mobile FAB ─────────────────────────────────────────── */}
       {createPortal(
         <motion.div
           initial={{ y: 100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ type: "spring", stiffness: 45, damping: 14 }}
-          className={`
-          fixed bottom-3 sm:hidden
-          ${fabOnLeft ? "left-1/2 -translate-x-1/2" : "left-0 -translate-x-7"}
-          flex items-center gap-3 z-50
-        `}
+          className={`fixed bottom-4 sm:hidden ${fabOnLeft ? "left-1/2 -translate-x-1/2" : "left-0 -translate-x-7"} flex items-center gap-2 z-50`}
         >
           <motion.div
             initial={false}
             animate={fabOnLeft ? "open" : "closed"}
-            transition={{
-              duration: 0.28,
-              ease: [0.22, 1, 0.36, 1],
-            }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
             variants={{
-              open: {
-                width: "auto",
-                opacity: 1,
-                pointerEvents: "auto",
-                x: 0,
-              },
-              closed: {
-                width: 0,
-                opacity: 0,
-                pointerEvents: "none",
-                x: -10,
-              },
+              open:   { width: "auto", opacity: 1, pointerEvents: "auto", x: 0 },
+              closed: { width: 0, opacity: 0, pointerEvents: "none", x: -10 },
             }}
-            className="
-      flex items-center gap-3 overflow-hidden
-      rounded-full bg-white/90 dark:bg-slate-800/90
-      backdrop-blur-xl shadow-xl border border-slate-200 dark:border-slate-700
-      px-4 py-0
-    "
+            className="flex items-center gap-1 overflow-hidden rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-0"
           >
-            <div
-              onClick={() => setShowSettings(true)}
-              className="p-3 rounded-full cursor-pointer active:scale-90 transition"
-            >
-              <Settings className="w-6 h-6 stroke-indigo-500 dark:stroke-indigo-300" />
-            </div>
-
-            <div
-              onClick={() => setShowConfirmDelete(true)}
-              className="p-3 rounded-full cursor-pointer active:scale-90 transition"
-            >
-              <Trash2 className="w-6 h-6 stroke-red-500 dark:stroke-red-300" />
-            </div>
-
-            <div
-              onClick={handleDownloadData}
-              className="p-3 rounded-full cursor-pointer active:scale-90 transition"
-            >
-              <Download className="w-6 h-6 stroke-emerald-500 dark:stroke-emerald-300" />
-            </div>
-            <div
-              className="p-3 rounded-full cursor-pointer active:scale-90 transition"
-              onClick={() => setShowWrapped(true)}
-            >
-              <Share2Icon className="w-6 h-6 stroke-slate-600 hover:stroke-slate-700 dark:stroke-slate-300 dark:hover:stroke-slate-200 transition-colors" />
-            </div>
-            <div
-              onClick={toggleTheme}
-              className="relative w-6 h-6 p-3 rounded-full cursor-pointer active:scale-90 transition"
-            >
-              <motion.div
+            <button onClick={() => setShowSettings(true)} className="p-5 rounded-full cursor-pointer active:scale-90 transition text-[var(--color-text-3)]">
+              <Settings className="w-8 h-8" />
+            </button>
+            <button onClick={() => setShowConfirmDelete(true)} className="p-5 rounded-full cursor-pointer active:scale-90 transition text-[var(--color-text-3)]">
+              <Trash2 className="w-8 h-8" />
+            </button>
+            <button onClick={handleDownloadData} className="p-5 rounded-full cursor-pointer active:scale-90 transition text-[var(--color-text-3)]">
+              <Download className="w-8 h-8" />
+            </button>
+            <button onClick={() => setShowWrapped(true)} className="p-5 rounded-full cursor-pointer active:scale-90 transition text-[var(--color-text-3)]">
+              <Share2Icon className="w-8 h-8" />
+            </button>
+            <button onClick={toggleTheme} className="relative p-5 rounded-full cursor-pointer active:scale-90 transition text-[var(--color-text-3)]">
+              <motion.span
                 className="absolute inset-0 flex items-center justify-center"
-                animate={{
-                  rotate: theme === "dark" ? 0 : 90,
-                  scale: theme === "dark" ? 1 : 0,
-                  opacity: theme === "dark" ? 1 : 0,
-                }}
-                transition={{ duration: 0.35, ease: "easeInOut" }}
+                animate={{ rotate: theme === "dark" ? 0 : 90, scale: theme === "dark" ? 1 : 0, opacity: theme === "dark" ? 1 : 0 }}
+                transition={{ duration: 0.2, ease: "easeInOut" }}
               >
-                <Sun className="w-6 h-6 stroke-slate-600 dark:stroke-slate-200" />
-              </motion.div>
-
-              <motion.div
+                <Sun className="w-8 h-8" />
+              </motion.span>
+              <motion.span
                 className="absolute inset-0 flex items-center justify-center"
-                animate={{
-                  rotate: theme === "light" ? 0 : -90,
-                  scale: theme === "light" ? 1 : 0,
-                  opacity: theme === "light" ? 1 : 0,
-                }}
-                transition={{ duration: 0.35, ease: "easeInOut" }}
+                animate={{ rotate: theme === "light" ? 0 : -90, scale: theme === "light" ? 1 : 0, opacity: theme === "light" ? 1 : 0 }}
+                transition={{ duration: 0.2, ease: "easeInOut" }}
               >
-                <Moon className="w-6 h-6 stroke-slate-600 dark:stroke-slate-200" />
-              </motion.div>
-            </div>
+                <Moon className="w-8 h-8" />
+              </motion.span>
+            </button>
           </motion.div>
 
-          <motion.div
+          <motion.button
             onClick={() => setFabOnLeft((v) => !v)}
             whileTap={{ scale: 0.9 }}
             animate={fabOnLeft ? { rotate: 90 } : { rotate: 0 }}
-            transition={{
-              type: "spring",
-              stiffness: 260,
-              damping: 20,
-            }}
-            className="
-      p-3 rounded-full bg-white dark:bg-slate-800
-      shadow-xl border border-slate-200 dark:border-slate-700
-      cursor-pointer
-    "
+            transition={{ type: "spring", stiffness: 260, damping: 20 }}
+            className="p-2.5 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] cursor-pointer text-[var(--color-text-2)]"
           >
-            <MenuIcon className="w-6 h-6 stroke-slate-700 dark:stroke-slate-300" />
-          </motion.div>
+            <MenuIcon className="w-4 h-4" />
+          </motion.button>
         </motion.div>,
         document.body,
       )}
+
       <SettingsModal
         showSettings={showSettings}
         showElements={showElements}
         setShowSettings={setShowSettings}
         setShowElements={setShowElements}
       />
+
+      {/* ─── Delete confirm ─────────────────────────────────────── */}
       {showConfirmDelete &&
         createPortal(
           <motion.div
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+            className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
             <motion.div
-              className="bg-white dark:bg-slate-800 rounded-xl p-6 w-80 max-w-sm shadow-xl flex flex-col gap-4"
-              initial={{ scale: 0.8, opacity: 0 }}
+              className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 w-72 max-w-sm flex flex-col gap-4"
+              initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 260, damping: 20 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ duration: 0.15 }}
             >
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                Are you sure?
-              </h3>
-              <p className="text-sm text-slate-700 dark:text-slate-300">
-                This will delete all your data and cannot be undone.
-              </p>
-              <div className="flex justify-end gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-[var(--color-text-1)]">
+                  Delete all data?
+                </h3>
+                <p className="text-xs text-[var(--color-text-2)] mt-1">
+                  This will permanently delete all your data and cannot be undone.
+                </p>
+              </div>
+              <div className="flex justify-end gap-2">
                 <button
                   onClick={() => setShowConfirmDelete(false)}
-                  className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                  className="px-3 py-1.5 rounded-md text-xs font-medium border border-[var(--color-border)] text-[var(--color-text-2)] hover:bg-[var(--color-surface-raised)] transition-colors duration-150"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={() => {
-                    clearData();
-                    setShowConfirmDelete(false);
-                  }}
-                  className="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white transition"
+                  onClick={() => { clearData(); setShowConfirmDelete(false); }}
+                  className="px-3 py-1.5 rounded-md text-xs font-medium bg-[var(--color-negative)] hover:opacity-90 text-white transition-opacity duration-150"
                 >
                   Delete
                 </button>
@@ -460,12 +388,10 @@ const Home: FC = () => {
           </motion.div>,
           document.body,
         )}
+
       {showWrapped &&
         createPortal(
-          <WrappedCarousel
-            data={wrappedData!}
-            onClose={() => setShowWrapped(false)}
-          />,
+          <WrappedCarousel data={wrappedData!} onClose={() => setShowWrapped(false)} />,
           document.body,
         )}
     </div>
