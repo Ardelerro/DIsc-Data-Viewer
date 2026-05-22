@@ -8,13 +8,13 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
+  ReferenceLine,
 } from "recharts";
-import { motion } from "framer-motion";
 import { useData } from "../../context/DataContext";
+import { CHART_TOOLTIP_STYLE, C } from "../../config/theme";
 
 const HourlyMoodChart: FC<{ className?: string }> = ({ className }) => {
   const { data } = useData();
-
 
   if (!data) return null;
 
@@ -30,74 +30,77 @@ const HourlyMoodChart: FC<{ className?: string }> = ({ className }) => {
     const moods = chartData.map((d) => d.mood);
     const minVal = Math.min(...moods);
     const maxVal = Math.max(...moods);
-
-    let range = maxVal - minVal;
-
-    if (range < 0.3) {
+    if (maxVal - minVal < 30) {
       const mid = (maxVal + minVal) / 2;
-      return [mid - 0.15, mid + 0.15];
+      return [mid - 15, mid + 15];
     }
-
-    return [Math.max(-1, minVal), Math.min(1, maxVal)];
+    return [Math.max(-100, minVal), Math.min(100, maxVal)];
   }, [chartData]);
-  
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 40 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
-      className={`text-slate-900 dark:text-slate-100 rounded-md ring-1 ring-slate-200 dark:ring-slate-700 bg-white/90 dark:bg-slate-800/80 backdrop-blur-xl shadow-lg p-6 ${className}`}
+    <div
+      className={`rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden ${className}`}
     >
-      <h2 className="mb-4 text-lg font-semibold leading-none text-slate-900 dark:text-slate-100">
-        Hourly Mood Bias
-      </h2>
-      <ResponsiveContainer width="100%" height={320} minWidth={250}>
-        <LineChart
-          data={chartData}
-          margin={{ top: 12, right: 18, bottom: 10, left: 12 }}
-        >
-          <CartesianGrid
-            strokeDasharray="3 3"
-            className="stroke-slate-200 dark:stroke-slate-600"
-          />
-          <XAxis
-            dataKey="hour"
-            tick={{ fill: "currentColor", fontSize: 12 }}
-            label={{
-              value: "Hour (24h)",
-              position: "insideBottom",
-              dy: 12,
-              fill: "currentColor",
-            }}
-          />
-          <YAxis
-            domain={yDomain as [number, number]}
-            tick={{ fill: "currentColor", fontSize: 12 }}
-            tickFormatter={(value) => value.toFixed(2)}
-            label={{
-              value: "Mood",
-              angle: -90,
-              position: "insideLeft",
-              dx: -12,
-              fill: "currentColor",
-            }}
-          />
-          <Tooltip
-            wrapperClassName="!rounded-2xl !px-3 !py-2 !bg-white/90 dark:!bg-slate-800/95 !border-0 !shadow-lg dark:!text-slate-300"
-            formatter={(value: number) => [value.toFixed(2), "Mood"]}
-            labelFormatter={(label) => `Hour ${label}:00`}
-          />
-          <Line
-            type="monotone"
-            dataKey="mood"
-            stroke="#6366F1"
-            strokeWidth={3}
-            dot={{ r: 4 }}
-            activeDot={{ r: 6 }}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </motion.div>
+      <div className="px-4 py-3 border-b border-[var(--color-border)]">
+        <h2 className="text-sm font-semibold text-[var(--color-text-1)]">
+          Hourly Mood Bias
+        </h2>
+      </div>
+
+      <div className="p-4 text-[var(--color-text-3)]">
+        <ResponsiveContainer width="100%" height={260} minWidth={250}>
+          <LineChart
+            data={chartData}
+            margin={{ top: 8, right: 18, bottom: 20, left: 12 }}
+          >
+            <CartesianGrid
+              strokeDasharray="0"
+              stroke="var(--color-border)"
+              vertical={false}
+            />
+            <ReferenceLine y={0} stroke={C.borderHover} strokeWidth={1} />
+            <XAxis
+              dataKey="hour"
+              tick={{ fill: "currentColor", fontSize: 10 }}
+              label={{
+                value: "Hour (24h)",
+                position: "insideBottom",
+                dy: 14,
+                fill: "currentColor",
+                fontSize: 10,
+              }}
+            />
+            <YAxis
+              domain={yDomain as [number, number]}
+              tick={{ fill: "currentColor", fontSize: 10 }}
+              tickFormatter={(value) => value.toFixed(0)}
+              label={{
+                value: "Mood",
+                angle: -90,
+                position: "insideLeft",
+                dx: -8,
+                fill: "currentColor",
+                fontSize: 10,
+              }}
+            />
+            <Tooltip
+              cursor={{ stroke: C.border, strokeWidth: 1 }}
+              contentStyle={CHART_TOOLTIP_STYLE}
+              formatter={(value: number) => [value.toFixed(1), "Mood"]}
+              labelFormatter={(label) => `${label}:00`}
+            />
+            <Line
+              type="monotone"
+              dataKey="mood"
+              stroke={C.accent}
+              strokeWidth={2}
+              dot={{ r: 2, fill: C.accent, strokeWidth: 0 }}
+              activeDot={{ r: 4, fill: C.accent, strokeWidth: 0 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
   );
 };
 

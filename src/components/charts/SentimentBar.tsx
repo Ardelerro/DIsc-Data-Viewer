@@ -2,21 +2,26 @@ import { AnimatePresence, motion } from "framer-motion";
 import type { FC } from "react";
 import { useState, useMemo } from "react";
 import type { SentimentStats } from "../../types/discord";
+import { SENTIMENT } from "../../config/theme";
 
-
+const bars = [
+  { label: "negative", ...SENTIMENT.negative, direction: "down" as const },
+  { label: "neutral",  ...SENTIMENT.neutral,  direction: "up"   as const },
+  { label: "positive", ...SENTIMENT.positive, direction: "down" as const },
+] as const;
 
 const SentimentBar: FC<{ sentiment: SentimentStats }> = ({ sentiment }) => {
   const [hovered, setHovered] = useState<string | null>(null);
 
   const mapSentimentToLogScale = (value: number): number => {
-    const clamped = Math.max(-1, Math.min(1, value));
-    const negThreshold = -0.15;
-    const posThreshold = 0.15;
+    const clamped = Math.max(-100, Math.min(100, value));
+    const negThreshold = -5;
+    const posThreshold = 5;
     const absVal = Math.abs(clamped);
-    const absThreshold = 0.15;
+    const absThreshold = 5;
     const norm =
       absVal > absThreshold
-        ? (absVal - absThreshold) / (1 - absThreshold)
+        ? (absVal - absThreshold) / (100 - absThreshold)
         : absVal / absThreshold;
     const logScaled = Math.log10(1 + 9 * norm) / Math.log10(10);
 
@@ -29,37 +34,29 @@ const SentimentBar: FC<{ sentiment: SentimentStats }> = ({ sentiment }) => {
 
   const averageLeft = useMemo(
     () => mapSentimentToLogScale(sentiment.average),
-    [sentiment.average]
+    [sentiment.average],
   );
 
-  const bars = [
-    {
-      label: "negative",
-      color: "bg-red-500 dark:bg-red-700",
-      count: sentiment.negative,
-      direction: "down",
-    },
-    {
-      label: "neutral",
-      color: "bg-yellow-400 dark:bg-yellow-600",
-      count: sentiment.neutral,
-      direction: "up",
-    },
-    {
-      label: "positive",
-      color: "bg-green-500 dark:bg-green-700",
-      count: sentiment.positive,
-      direction: "down",
-    },
-  ];
+  const counts: Record<string, number> = {
+    negative: sentiment.negative,
+    neutral:  sentiment.neutral,
+    positive: sentiment.positive,
+  };
+
+  const badgeClass =
+    sentiment.average > 5
+      ? SENTIMENT.positive.badge
+      : sentiment.average < -5
+      ? SENTIMENT.negative.badge
+      : SENTIMENT.neutral.badge;
 
   return (
     <div className="relative w-full overflow-visible">
       <div className="w-full h-4 rounded-full flex relative overflow-visible">
-        {bars.map(({ label, color, count, direction }) => (
+        {bars.map(({ label, bar, tooltip, direction }) => (
           <div
             key={label}
-            className={`flex-1 ${color} relative`}
+            className={`flex-1 ${bar} relative`}
             onMouseEnter={() => setHovered(label)}
             onMouseLeave={() => setHovered(null)}
           >
@@ -75,15 +72,9 @@ const SentimentBar: FC<{ sentiment: SentimentStats }> = ({ sentiment }) => {
                     animate={{ opacity: 1, y: direction === "up" ? -28 : 20 }}
                     exit={{ opacity: 0, y: direction === "up" ? 0 : -6 }}
                     transition={{ duration: 0.1, ease: "easeOut" }}
-                    className={`absolute left-1/2 -translate-x-1/2 text-white text-xs font-medium rounded-md px-2 py-1 shadow-md whitespace-nowrap ${
-                      color.includes("red")
-                        ? "bg-red-600"
-                        : color.includes("yellow")
-                        ? "bg-yellow-500"
-                        : "bg-green-600"
-                    }`}
+                    className={`absolute left-1/2 -translate-x-1/2 text-xs font-medium rounded-md px-2 py-1 shadow-md whitespace-nowrap ${tooltip}`}
                   >
-                    {count} messages
+                    {counts[label]} messages
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -92,35 +83,21 @@ const SentimentBar: FC<{ sentiment: SentimentStats }> = ({ sentiment }) => {
         ))}
 
         <div
-          className="absolute top-0 bottom-0 w-[2px] bg-black dark:bg-white z-20"
-          style={{
-            left: `${averageLeft}%`,
-            transition: "left 0.3s ease",
-          }}
-        ></div>
+          className={`absolute top-0 bottom-0 w-[2px] z-20 ${SENTIMENT.indicator}`}
+          style={{ left: `${averageLeft}%`, transition: "left 0.3s ease" }}
+        />
 
         <div
           className="absolute -top-7 transform -translate-x-1/2 z-30"
-          style={{
-            left: `${averageLeft}%`,
-            transition: "left 0.3s ease",
-          }}
+          style={{ left: `${averageLeft}%`, transition: "left 0.3s ease" }}
         >
-          <span
-            className={`text-sm font-semibold px-2 py-1 rounded-md shadow-md ${
-              sentiment.average > 0.15
-                ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300"
-                : sentiment.average < -0.15
-                ? "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300"
-                : "bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300"
-            }`}
-          >
-            {sentiment.average.toFixed(2)}
+          <span className={`text-sm font-semibold px-2 py-1 rounded-md shadow-md ${badgeClass}`}>
+            {Math.round(sentiment.average)}
           </span>
         </div>
       </div>
 
-      <div className="flex justify-between text-xs text-slate-600 dark:text-slate-400 mt-1">
+      <div className={`flex justify-between text-xs mt-1 ${SENTIMENT.label}`}>
         <span>Negative</span>
         <span>Neutral</span>
         <span>Positive</span>
