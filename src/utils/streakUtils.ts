@@ -1,3 +1,9 @@
+function nextDay(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const next = new Date(y, m - 1, d + 1);
+  return `${next.getFullYear()}-${(next.getMonth() + 1).toString().padStart(2, "0")}-${next.getDate().toString().padStart(2, "0")}`;
+}
+
 function calculateStreak(dates: Set<string>) {
   if (dates.size === 0) return { length: 0, start: null, end: null };
 
@@ -9,13 +15,7 @@ function calculateStreak(dates: Set<string>) {
     end = start;
 
   for (let i = 1; i < sorted.length; i++) {
-    const prevDate = new Date(sorted[i - 1]);
-    const currDate = new Date(sorted[i]);
-    const dayDiff = Math.floor(
-      (currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24)
-    );
-
-    if (dayDiff === 1) {
+    if (sorted[i] === nextDay(sorted[i - 1])) {
       current++;
       if (current > longest) {
         longest = current;
