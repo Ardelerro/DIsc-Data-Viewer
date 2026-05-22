@@ -7,10 +7,25 @@ const H = 1920;
 const cardCache = new Map<string, string>();
 
 
-function avatarUrl(id: string, avatarHash?: string): string {
-  if (id && avatarHash)
-    return `https://cdn.discordapp.com/avatars/${id}/${avatarHash}.png?size=256`;
-  return `https://cdn.discordapp.com/embed/avatars/${Number(id) % 5}.png`;
+const FALLBACK_AVATAR = `data:image/svg+xml;base64,${btoa('<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><circle cx="128" cy="128" r="128" fill="#5865f2"/><circle cx="128" cy="96" r="52" fill="#fff"/><ellipse cx="128" cy="230" rx="90" ry="72" fill="#fff"/></svg>')}`;
+
+async function avatarToDataUrl(id: string, avatarHash?: string): Promise<string> {
+  const cdnUrl = id && avatarHash
+    ? `/discord-cdn/avatars/${id}/${avatarHash}.png?size=256`
+    : `/discord-cdn/embed/avatars/${Number(id) % 5}.png`;
+  try {
+    const res = await fetch(cdnUrl);
+    if (!res.ok) return FALLBACK_AVATAR;
+    const blob = await res.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return FALLBACK_AVATAR;
+  }
 }
 
 function peakHour(hourly: Record<string, number> = {}): string {
@@ -489,8 +504,7 @@ async function captureCard(
 export async function previewAllCards(
   data: WrappedCardData,
 ): Promise<Array<{ id: string; label: string; bg: string; dataUrl: string }>> {
-  //console.log(data);
-  const av = avatarUrl(data.self.id, data.self.avatar_hash);
+  const av = await avatarToDataUrl(data.self.id, data.self.avatar_hash);
   const results = [];
   for (const card of WRAPPED_CARDS) {
     const dataUrl = await captureCardCached(card.buildHTML(data, av),card.id + "preview", "preview");
@@ -506,7 +520,7 @@ export async function downloadWrappedCard(
 ): Promise<void> {
   const card = WRAPPED_CARDS.find((c) => c.id === cardId);
   if (!card) throw new Error(`Unknown card id: ${cardId}`);
-  const av = avatarUrl(data.self.id, data.self.avatar_hash);
+  const av = await avatarToDataUrl(data.self.id, data.self.avatar_hash);
   const dataUrl = await captureCardCached(card.buildHTML(data, av), cardId + "download", "download");
   const a = document.createElement("a");
   a.href = dataUrl;
