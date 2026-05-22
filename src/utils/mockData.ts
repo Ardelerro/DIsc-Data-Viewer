@@ -27,6 +27,7 @@ export interface SentimentStats {
 export interface ChannelStats {
   hourly: Record<string, number>;
   monthly: Record<string, number>;
+  daily: Record<string, number>;
   sentiment: SentimentStats;
   totalGapTime: number;
   numGaps: number;
@@ -46,6 +47,7 @@ export interface ChannelStats {
 export interface AggregateStats {
   hourly: Record<string, number>;
   monthly: Record<string, number>;
+  daily: Record<string, number>;
   topWords: string[];
   totalGapTime: number;
   numGaps: number;
@@ -55,6 +57,7 @@ export interface AggregateStats {
   longestConversationTime: number;
   hourlySentimentTotal: Record<string, number>;
   hourlySentimentAverage: Record<string, number>;
+  usersPerDay: Record<string, number>;
 }
 
 export interface ServerMapping {
@@ -255,6 +258,20 @@ function makeMonthly(): Record<string, number> {
   return months;
 }
 
+function makeDaily(): Record<string, number> {
+  const daily: Record<string, number> = {};
+  const now = Date.now();
+  const spanMs = 3 * 365 * 24 * 3600 * 1000;
+  const numEntries = randInt(60, 300);
+  for (let i = 0; i < numEntries; i++) {
+    const ms = now - rand() * spanMs;
+    const d = new Date(ms);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    daily[key] = (daily[key] || 0) + randInt(1, 150);
+  }
+  return daily;
+}
+
 function makeTopWords(n = 50): string[] {
   const pool = [...DISCORD_WORDS, ...Array.from({ length: 20 }, fakeWord)];
   return randSample(pool, Math.min(n, pool.length));
@@ -266,7 +283,7 @@ function makeSentiment(): SentimentStats {
   const neg   = randInt(0, total - pos);
   const neu   = total - pos - neg;
   return {
-    average:  parseFloat(randFloat(-2.0, 2.0).toFixed(4)),
+    average:  parseFloat(randFloat(-30, 30).toFixed(2)),
     positive: pos,
     negative: neg,
     neutral:  neu,
@@ -291,6 +308,7 @@ function makeChannelStats(channelType: ChannelType, recipientName: string): Chan
   return {
     hourly,
     monthly,
+    daily: makeDaily(),
     sentiment: makeSentiment(),
     totalGapTime:             totalGap,
     numGaps,
@@ -318,14 +336,15 @@ function makeAggregateStats(channelStatsMap: Record<string, ChannelStats>): Aggr
   const hourlySentimentTotal: Record<string, number> = {};
   const hourlySentimentAverage: Record<string, number> = {};
   for (const [h, count] of Object.entries(hourly)) {
-    const t = parseFloat(randFloat(-count, count).toFixed(2));
-    hourlySentimentTotal[h]   = t;
-    hourlySentimentAverage[h] = count > 0 ? parseFloat((t / count).toFixed(4)) : 0;
+    const avg = parseFloat(randFloat(-30, 30).toFixed(2));
+    hourlySentimentAverage[h] = avg;
+    hourlySentimentTotal[h]   = parseFloat((avg * count).toFixed(2));
   }
 
   return {
     hourly,
     monthly,
+    daily: makeDaily(),
     topWords: makeTopWords(50),
     totalGapTime: totalGap,
     numGaps,
@@ -335,6 +354,7 @@ function makeAggregateStats(channelStatsMap: Record<string, ChannelStats>): Aggr
     longestConversationTime:   randInt(3600, 3600 * 48),
     hourlySentimentTotal,
     hourlySentimentAverage,
+    usersPerDay: {},
   };
 }
 export function generateMockDiscordData(options: GeneratorOptions = {}): ProcessedData {
