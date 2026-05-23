@@ -11,6 +11,9 @@ import {
   Headphones,
   Monitor,
   BookUser,
+  CalendarDays,
+  Globe,
+  UserRound,
 } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { computePersonality } from "../../achievements/computePersonality";
@@ -87,15 +90,39 @@ const SelfDisplay: FC = () => {
   const totalChannels = Object.keys(channelStats).length;
   let minDate = Infinity;
   let maxDate = -Infinity;
-  const ActivityIcons = [<Paperclip />, <Smile />, <Headphones />, <PhoneCall />, <Monitor />, <BookUser />];
-  const ActivityLabels = ["Attachments sent", "Reactions added", "Voice channels joined", "DM calls", "Discord opened", "Total channels"]
+  // Avg unique DM conversations per day
+  const dmChannelsPerDay = new Map<string, Set<string>>();
+  for (const [key, stats] of Object.entries(channelStats)) {
+    if (!key.startsWith("dm_")) continue;
+    for (const date in stats.daily) {
+      if ((stats.daily[date] ?? 0) > 0) {
+        if (!dmChannelsPerDay.has(date)) dmChannelsPerDay.set(date, new Set());
+        dmChannelsPerDay.get(date)!.add(key);
+      }
+    }
+  }
+  const dmDayCount = dmChannelsPerDay.size;
+  let dmChannelDaySum = 0;
+  for (const s of dmChannelsPerDay.values()) dmChannelDaySum += s.size;
+  const avgPeoplePerDay = dmDayCount > 0 ? (dmChannelDaySum / dmDayCount).toFixed(1) : "0";
+
+  const totalServers = Object.keys(data.serverMapping.serverNames).length;
+  const daysActiveCount = Object.keys(aggregateStats.daily || {}).filter(
+    (d) => (aggregateStats.daily![d] ?? 0) > 0,
+  ).length;
+
+  const ActivityIcons = [<Paperclip />, <Smile />, <Headphones />, <PhoneCall />, <Monitor />, <BookUser />, <UserRound />, <Globe />, <CalendarDays />];
+  const ActivityLabels = ["Attachments sent", "Reactions added", "Voice channels joined", "DM calls", "Discord opened", "Total channels", "Avg. people/day", "Total servers", "Days active"]
   const ActivityStats = [
     data.activityStats.attachmentsSent,
     data.activityStats.addReaction,
     data.activityStats.joinVoice,
     data.activityStats.joinCall,
     data.activityStats.appOpened,
-    totalChannels
+    totalChannels,
+    avgPeoplePerDay,
+    totalServers,
+    daysActiveCount,
   ]
   const ActivityStatDisplays=ActivityIcons.map((icon, index) => ({
     icon: icon,
