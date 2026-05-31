@@ -51,7 +51,9 @@ const UserCombobox: FC<{
             setQuery(e.target.value);
             setOpen(true);
           }}
-          placeholder={selectedUser ? `${selectedUser.name}` : "Search users..."}
+          placeholder={
+            selectedUser ? `${selectedUser.name}` : "Search users..."
+          }
           className="w-full bg-transparent outline-none text-slate-900 dark:text-white"
         />
       </div>
@@ -82,9 +84,13 @@ const UserCombobox: FC<{
                 </div>
                 <div className="text-xs text-slate-500">
                   {rankingType === "messages" ? (
-                    <>#{user.rank} • {user.total.toLocaleString()} messages</>
+                    <>
+                      #{user.rank} • {user.total.toLocaleString()} messages
+                    </>
                   ) : (
-                    <>#{user.rank} • {user.total.toFixed(2)} sentiment</>
+                    <>
+                      #{user.rank} • {user.total.toFixed(2)} sentiment
+                    </>
                   )}
                 </div>
               </div>
@@ -92,7 +98,9 @@ const UserCombobox: FC<{
           ))}
 
           {filtered.length === 0 && (
-            <div className="px-4 py-3 text-sm text-slate-500">No users found</div>
+            <div className="px-4 py-3 text-sm text-slate-500">
+              No users found
+            </div>
           )}
         </div>
       )}

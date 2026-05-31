@@ -1,13 +1,17 @@
 import type { FC } from "react";
 import { useState } from "react";
 import { TIME_PILL } from "../../config/theme";
-import { type TimePreset, type DateRange, getPresetRange } from "../../utils/timeFilterUtils";
+import {
+  type TimePreset,
+  type DateRange,
+  getPresetRange,
+} from "../../utils/timeFilterUtils";
 const PRESETS: { key: TimePreset; label: string; needsDaily: boolean }[] = [
-  { key: "all",  label: "All time", needsDaily: false },
-  { key: "7d",   label: "7 days",   needsDaily: true  },
-  { key: "30d",  label: "30 days",  needsDaily: true  },
-  { key: "365d", label: "1 year",   needsDaily: false },
-  { key: "custom", label: "Custom",   needsDaily: true },
+  { key: "all", label: "All time", needsDaily: false },
+  { key: "7d", label: "7 days", needsDaily: true },
+  { key: "30d", label: "30 days", needsDaily: true },
+  { key: "365d", label: "1 year", needsDaily: false },
+  { key: "custom", label: "Custom", needsDaily: true },
 ];
 
 const TimeRangeSelector: FC<{
@@ -49,7 +53,11 @@ const TimeRangeSelector: FC<{
             key={key}
             disabled={disabled}
             onClick={() => !disabled && handlePreset(key)}
-            title={disabled ? "Re-upload your data to enable sub-monthly filters" : undefined}
+            title={
+              disabled
+                ? "Re-upload your data to enable sub-monthly filters"
+                : undefined
+            }
             className={`${TIME_PILL.base} ${active ? TIME_PILL.active : disabled ? TIME_PILL.disabled : TIME_PILL.inactive}`}
           >
             {label}
