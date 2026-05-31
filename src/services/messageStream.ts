@@ -1,64 +1,25 @@
+import { JSONParser } from "@streamparser/json";
 
-export function createObjectStreamParser(onObject: (objText: string) => void) {
-  let inObject = false;
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-  let pending = ""; 
+export function createStreamParser(
+  onObject: (obj: Record<string, unknown>) => void,
+): { feed(chunk: Uint8Array): void } {
+  const parser = new JSONParser({ paths: ["$.*"], keepStack: false });
 
-  function feed(text: string): void {
-    const n = text.length;
-    let i = 0;
-    let objStart = inObject ? 0 : -1;
-
-    while (i < n) {
-      if (!inObject) {
-        const open = text.indexOf("{", i);
-        if (open === -1) return;
-        inObject = true;
-        depth = 1;
-        inString = false;
-        escaped = false;
-        objStart = open;
-        i = open + 1;
-      }
-
-      let closed = false;
-      for (; i < n; i++) {
-        const c = text.charCodeAt(i);
-        if (inString) {
-          if (escaped) escaped = false;
-          else if (c === 92) escaped = true;
-          else if (c === 34) inString = false;
-          continue;
-        }
-        if (c === 34) {
-          inString = true;
-          continue;
-        }
-        if (c === 123) {
-          depth++; // {
-        } else if (c === 125) {
-          depth--; // }
-          if (depth === 0) {
-            onObject(pending + text.slice(objStart, i + 1));
-            pending = "";
-            inObject = false;
-            i++;
-            closed = true;
-            break;
-          }
-        }
-      }
-
-      if (!closed && inObject) {
-        pending += text.slice(objStart);
-        return;
-      }
+  parser.onValue = ({ value }) => {
+    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+      onObject(value as Record<string, unknown>);
     }
-  }
+  };
 
-  return { feed };
+  parser.onError = (err) => {
+    throw err;
+  };
+
+  return {
+    feed(chunk: Uint8Array): void {
+      parser.write(chunk);
+    },
+  };
 }
 
 export interface ParsedTs {
@@ -71,15 +32,14 @@ export interface ParsedTs {
 const d2 = (n: number) => (n < 10 ? "0" + n : "" + n);
 
 export function parseTimestamp(raw: string): ParsedTs | null {
-  
   if (raw.length >= 19) {
     const sep = raw.charCodeAt(10);
     if (
-      raw.charCodeAt(4) === 45 && // -
-      raw.charCodeAt(7) === 45 && // -
-      (sep === 32 || sep === 84) && // space or T
-      raw.charCodeAt(13) === 58 && // :
-      raw.charCodeAt(16) === 58 // :
+      raw.charCodeAt(4) === 45 &&
+      raw.charCodeAt(7) === 45 &&
+      (sep === 32 || sep === 84) &&
+      raw.charCodeAt(13) === 58 &&
+      raw.charCodeAt(16) === 58
     ) {
       const y = +raw.slice(0, 4);
       const mo = +raw.slice(5, 7);
@@ -105,7 +65,7 @@ export function parseTimestamp(raw: string): ParsedTs | null {
       }
     }
   }
-  // Fallback: let the engine handle anything non-standard.
+
   const dt = new Date(String(raw).replace(" ", "T"));
   const t = dt.getTime();
   if (Number.isNaN(t)) return null;
