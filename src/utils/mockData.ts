@@ -1,4 +1,3 @@
-
 export interface SelfUser {
   id: string;
   username: string;
@@ -95,7 +94,6 @@ export interface GeneratorOptions {
   seed?: number;
 }
 
-
 function makePrng(seed: number) {
   let s = seed >>> 0;
   return () => {
@@ -142,56 +140,193 @@ function randSample<T>(arr: T[], n: number): T[] {
 const DISCORD_EPOCH_MS = new Date("2015-05-13T00:00:00Z").getTime();
 
 const DISCORD_WORDS = [
-  "lol", "bro", "ngl", "fr", "based", "cringe", "sus", "gg", "ez",
-  "pog", "poggers", "kek", "rip", "f", "w", "l", "ratio", "cope",
-  "seethe", "touch", "grass", "vibes", "lowkey", "highkey", "literally",
-  "actually", "yeah", "nah", "wait", "bruh", "omg", "wtf", "lmao",
-  "lmfao", "irl", "afk", "gtg", "smh", "imo", "tbh", "idk", "nvm",
-  "rn", "btw", "fyi", "dm", "ping", "bot", "server", "channel",
-  "role", "mod", "admin", "ban", "mute", "kick", "thread", "voice",
+  "lol",
+  "bro",
+  "ngl",
+  "fr",
+  "based",
+  "cringe",
+  "sus",
+  "gg",
+  "ez",
+  "pog",
+  "poggers",
+  "kek",
+  "rip",
+  "f",
+  "w",
+  "l",
+  "ratio",
+  "cope",
+  "seethe",
+  "touch",
+  "grass",
+  "vibes",
+  "lowkey",
+  "highkey",
+  "literally",
+  "actually",
+  "yeah",
+  "nah",
+  "wait",
+  "bruh",
+  "omg",
+  "wtf",
+  "lmao",
+  "lmfao",
+  "irl",
+  "afk",
+  "gtg",
+  "smh",
+  "imo",
+  "tbh",
+  "idk",
+  "nvm",
+  "rn",
+  "btw",
+  "fyi",
+  "dm",
+  "ping",
+  "bot",
+  "server",
+  "channel",
+  "role",
+  "mod",
+  "admin",
+  "ban",
+  "mute",
+  "kick",
+  "thread",
+  "voice",
 ];
 
 const FAKE_WORDS = [
-  "shadow", "ember", "frost", "storm", "pixel", "nova", "echo", "drift",
-  "cipher", "nexus", "quasar", "vector", "pulse", "glitch", "forge", "haven",
-  "surge", "phantom", "orbit", "relay", "vertex", "flux", "zenith", "prism",
-  "torrent", "static", "hollow", "beacon", "crest", "vortex",
+  "shadow",
+  "ember",
+  "frost",
+  "storm",
+  "pixel",
+  "nova",
+  "echo",
+  "drift",
+  "cipher",
+  "nexus",
+  "quasar",
+  "vector",
+  "pulse",
+  "glitch",
+  "forge",
+  "haven",
+  "surge",
+  "phantom",
+  "orbit",
+  "relay",
+  "vertex",
+  "flux",
+  "zenith",
+  "prism",
+  "torrent",
+  "static",
+  "hollow",
+  "beacon",
+  "crest",
+  "vortex",
 ];
 
 const FIRST_NAMES = [
-  "alex", "jordan", "morgan", "taylor", "riley", "casey", "skyler", "drew",
-  "quinn", "avery", "parker", "reese", "sage", "blake", "charlie", "finley",
+  "alex",
+  "jordan",
+  "morgan",
+  "taylor",
+  "riley",
+  "casey",
+  "skyler",
+  "drew",
+  "quinn",
+  "avery",
+  "parker",
+  "reese",
+  "sage",
+  "blake",
+  "charlie",
+  "finley",
 ];
 
 const LAST_NAMES = [
-  "smith", "jones", "brown", "davis", "miller", "wilson", "moore", "taylor",
-  "anderson", "thomas", "jackson", "white", "harris", "martin", "garcia",
+  "smith",
+  "jones",
+  "brown",
+  "davis",
+  "miller",
+  "wilson",
+  "moore",
+  "taylor",
+  "anderson",
+  "thomas",
+  "jackson",
+  "white",
+  "harris",
+  "martin",
+  "garcia",
 ];
 
 const CHANNEL_PREFIXES = [
-  "general", "memes", "off-topic", "gaming", "music", "art",
-  "help", "announcements", "bot-commands", "spam", "tech",
-  "nsfw", "politics", "science", "food", "pets", "sports",
+  "general",
+  "memes",
+  "off-topic",
+  "gaming",
+  "music",
+  "art",
+  "help",
+  "announcements",
+  "bot-commands",
+  "spam",
+  "tech",
+  "nsfw",
+  "politics",
+  "science",
+  "food",
+  "pets",
+  "sports",
 ];
 
-const CHANNEL_SUFFIXES = ["", "-chat", "-lounge", "-hub", "-zone", "-central", "-only"];
+const CHANNEL_SUFFIXES = [
+  "",
+  "-chat",
+  "-lounge",
+  "-hub",
+  "-zone",
+  "-central",
+  "-only",
+];
 
-const GUILD_TYPES = new Set<ChannelType>(["GUILD_TEXT", "PUBLIC_THREAD", "GUILD_VOICE"]);
-const DM_TYPES    = new Set<ChannelType>(["DM", "GROUP_DM"]);
+const GUILD_TYPES = new Set<ChannelType>([
+  "GUILD_TEXT",
+  "PUBLIC_THREAD",
+  "GUILD_VOICE",
+]);
+const DM_TYPES = new Set<ChannelType>(["DM", "GROUP_DM"]);
 
 function md5like(): string {
   return Array.from({ length: 32 }, () =>
-    Math.floor(rand() * 16).toString(16)
+    Math.floor(rand() * 16).toString(16),
   ).join("");
 }
 
 function snowflake(): string {
   const nowMs = Date.now();
-  const discordMs = Math.max(nowMs - DISCORD_EPOCH_MS - randInt(0, 3 * 365 * 24 * 3600 * 1000), 0);
-  const worker    = randInt(0, 31);
-  const process   = randInt(0, 31);
+  const discordMs = Math.max(
+    nowMs - DISCORD_EPOCH_MS - randInt(0, 3 * 365 * 24 * 3600 * 1000),
+    0,
+  );
+  const worker = randInt(0, 31);
+  const process = randInt(0, 31);
   const increment = randInt(0, 4095);
-  const id = (BigInt(discordMs) << 22n) | (BigInt(worker) << 17n) | (BigInt(process) << 12n) | BigInt(increment);
+  const id =
+    (BigInt(discordMs) << 22n) |
+    (BigInt(worker) << 17n) |
+    (BigInt(process) << 12n) |
+    BigInt(increment);
   return id.toString();
 }
 
@@ -227,7 +362,8 @@ function makeChannelName(): string {
 
 function makeServerName(): string {
   const templates = [
-    () => fakeWord().charAt(0).toUpperCase() + fakeWord().slice(1) + " Community",
+    () =>
+      fakeWord().charAt(0).toUpperCase() + fakeWord().slice(1) + " Community",
     () => fakeWord().charAt(0).toUpperCase() + fakeWord().slice(1) + " Server",
     () => randChoice(FIRST_NAMES) + "'s Discord",
     () =>
@@ -279,27 +415,30 @@ function makeTopWords(n = 50): string[] {
 
 function makeSentiment(): SentimentStats {
   const total = randInt(100, 50_000);
-  const pos   = randInt(0, total);
-  const neg   = randInt(0, total - pos);
-  const neu   = total - pos - neg;
+  const pos = randInt(0, total);
+  const neg = randInt(0, total - pos);
+  const neu = total - pos - neg;
   return {
-    average:  parseFloat(randFloat(-30, 30).toFixed(2)),
+    average: parseFloat(randFloat(-30, 30).toFixed(2)),
     positive: pos,
     negative: neg,
-    neutral:  neu,
+    neutral: neu,
   };
 }
 
-function makeChannelStats(channelType: ChannelType, recipientName: string): ChannelStats {
-  const hourly     = makeHourly();
-  const monthly    = makeMonthly();
-  const msgCount   = randInt(50, 50_000);
-  const numGaps    = randInt(1, 500);
-  const totalGap   = numGaps * randInt(1800, 7200);
-  const totalConv  = randInt(600, 3600 * 8);
-  const streakLen  = randInt(0, 365);
+function makeChannelStats(
+  channelType: ChannelType,
+  recipientName: string,
+): ChannelStats {
+  const hourly = makeHourly();
+  const monthly = makeMonthly();
+  const msgCount = randInt(50, 50_000);
+  const numGaps = randInt(1, 500);
+  const totalGap = numGaps * randInt(1800, 7200);
+  const totalConv = randInt(600, 3600 * 8);
+  const streakLen = randInt(0, 365);
   const streakStart = dateStr(2.0);
-  const streakEnd   = dateStr(0.1);
+  const streakEnd = dateStr(0.1);
 
   const firstMessageTimestamp = DM_TYPES.has(channelType)
     ? dateStr(2.5)
@@ -310,14 +449,18 @@ function makeChannelStats(channelType: ChannelType, recipientName: string): Chan
     monthly,
     daily: makeDaily(),
     sentiment: makeSentiment(),
-    totalGapTime:             totalGap,
+    totalGapTime: totalGap,
     numGaps,
-    totalConversationTime:    totalConv,
-    longestConversationTime:  randInt(600, 3600 * 24),
-    messageCount:             msgCount,
-    averageGapBetweenMessages: parseFloat((totalGap / Math.max(numGaps, 1)).toFixed(2)),
-    averageConversationTime:   parseFloat((totalConv / Math.max(numGaps + 1, 1)).toFixed(2)),
-    topWords:    makeTopWords(50),
+    totalConversationTime: totalConv,
+    longestConversationTime: randInt(600, 3600 * 24),
+    messageCount: msgCount,
+    averageGapBetweenMessages: parseFloat(
+      (totalGap / Math.max(numGaps, 1)).toFixed(2),
+    ),
+    averageConversationTime: parseFloat(
+      (totalConv / Math.max(numGaps + 1, 1)).toFixed(2),
+    ),
+    topWords: makeTopWords(50),
     longestStreak: streakLen,
     streakStart,
     streakEnd,
@@ -326,19 +469,24 @@ function makeChannelStats(channelType: ChannelType, recipientName: string): Chan
   };
 }
 
-function makeAggregateStats(channelStatsMap: Record<string, ChannelStats>): AggregateStats {
-  const hourly   = makeHourly();
-  const monthly  = makeMonthly();
-  const totalMsgs = Object.values(channelStatsMap).reduce((s, v) => s + v.messageCount, 0);
-  const numGaps   = randInt(100, 5000);
-  const totalGap  = numGaps * randInt(1800, 7200);
+function makeAggregateStats(
+  channelStatsMap: Record<string, ChannelStats>,
+): AggregateStats {
+  const hourly = makeHourly();
+  const monthly = makeMonthly();
+  const totalMsgs = Object.values(channelStatsMap).reduce(
+    (s, v) => s + v.messageCount,
+    0,
+  );
+  const numGaps = randInt(100, 5000);
+  const totalGap = numGaps * randInt(1800, 7200);
 
   const hourlySentimentTotal: Record<string, number> = {};
   const hourlySentimentAverage: Record<string, number> = {};
   for (const [h, count] of Object.entries(hourly)) {
     const avg = parseFloat(randFloat(-30, 30).toFixed(2));
     hourlySentimentAverage[h] = avg;
-    hourlySentimentTotal[h]   = parseFloat((avg * count).toFixed(2));
+    hourlySentimentTotal[h] = parseFloat((avg * count).toFixed(2));
   }
 
   return {
@@ -349,33 +497,31 @@ function makeAggregateStats(channelStatsMap: Record<string, ChannelStats>): Aggr
     totalGapTime: totalGap,
     numGaps,
     messageCount: totalMsgs || randInt(10_000, 500_000),
-    averageGapBetweenMessages: parseFloat((totalGap / Math.max(numGaps, 1)).toFixed(2)),
-    averageConversationTime:   parseFloat(randFloat(300, 7200).toFixed(2)),
-    longestConversationTime:   randInt(3600, 3600 * 48),
+    averageGapBetweenMessages: parseFloat(
+      (totalGap / Math.max(numGaps, 1)).toFixed(2),
+    ),
+    averageConversationTime: parseFloat(randFloat(300, 7200).toFixed(2)),
+    longestConversationTime: randInt(3600, 3600 * 48),
     hourlySentimentTotal,
     hourlySentimentAverage,
     usersPerDay: {},
   };
 }
-export function generateMockDiscordData(options: GeneratorOptions = {}): ProcessedData {
-  const {
-    users    = 300,
-    channels = 40,
-    dms      = 80,
-    servers  = 10,
-    seed,
-  } = options;
+export function generateMockDiscordData(
+  options: GeneratorOptions = {},
+): ProcessedData {
+  const { users = 300, channels = 40, dms = 80, servers = 10, seed } = options;
 
   rand = seed !== undefined ? makePrng(seed) : Math.random;
 
-  const allUserIds   = Array.from({ length: users },    snowflake);
+  const allUserIds = Array.from({ length: users }, snowflake);
   const guildChanIds = Array.from({ length: channels }, snowflake);
-  const dmChanIds    = Array.from({ length: dms },      snowflake);
-  const allChanIds   = [...guildChanIds, ...dmChanIds];
+  const dmChanIds = Array.from({ length: dms }, snowflake);
+  const allChanIds = [...guildChanIds, ...dmChanIds];
 
   const selfObj: SelfUser = {
-    id:          snowflake(),
-    username:    makeUsername(),
+    id: snowflake(),
+    username: makeUsername(),
     avatar_hash: md5like(),
   };
 
@@ -395,7 +541,8 @@ export function generateMockDiscordData(options: GeneratorOptions = {}): Process
 
   const channelNaming: Record<string, string> = {};
   for (const cid of allChanIds) {
-    if (GUILD_TYPES.has(channelMapping[cid])) channelNaming[cid] = makeChannelName();
+    if (GUILD_TYPES.has(channelMapping[cid]))
+      channelNaming[cid] = makeChannelName();
   }
 
   const userMapping: Record<string, UserEntry> = {};
@@ -409,54 +556,53 @@ export function generateMockDiscordData(options: GeneratorOptions = {}): Process
 
   const channelToServer: Record<string, string> = {};
   for (const cid of allChanIds) {
-    if (GUILD_TYPES.has(channelMapping[cid])) channelToServer[cid] = randChoice(serverIds);
+    if (GUILD_TYPES.has(channelMapping[cid]))
+      channelToServer[cid] = randChoice(serverIds);
   }
   const serverMapping: ServerMapping = { channelToServer, serverNames };
 
   const channelStats: Record<string, ChannelStats> = {};
   const channelManifest: string[] = [];
-  const dmManifest: string[]      = [];
+  const dmManifest: string[] = [];
 
   for (const cid of allChanIds) {
     const t = channelMapping[cid];
 
     if (t === "DM") {
-      const uid   = randChoice(allUserIds);
+      const uid = randChoice(allUserIds);
       const rname = userMapping[uid]?.username ?? makeUsername();
-      const key   = `dm_${cid}`;
+      const key = `dm_${cid}`;
       channelStats[key] = makeChannelStats("DM", rname);
       dmManifest.push(`${key}.json`);
-
     } else if (t === "GROUP_DM") {
       const key = `dm_${cid}`;
       channelStats[key] = makeChannelStats("GROUP_DM", `Group DM (${cid})`);
       dmManifest.push(`${key}.json`);
-
     } else {
       const rname = channelNaming[cid] ?? `Unnamed Channel (${cid})`;
-      const key   = `channel_${cid}`;
+      const key = `channel_${cid}`;
       channelStats[key] = makeChannelStats(t, rname);
       channelManifest.push(`${key}.json`);
     }
   }
 
   return {
-    self:            selfObj,
+    self: selfObj,
     userMapping,
     channelMapping,
     channelNaming,
     channelManifest,
     serverMapping,
-    aggregateStats:  makeAggregateStats(channelStats),
+    aggregateStats: makeAggregateStats(channelStats),
     channelStats,
     dmManifest,
     activityStats: {
-      addReaction:     randInt(0, 50_000),
+      addReaction: randInt(0, 50_000),
       attachmentsSent: randInt(0, 10_000),
-      joinVoice:       randInt(0, 5_000),
-      startCall:       randInt(0, 2_000),
-      joinCall:        randInt(0, 3_000),
-      appOpened:       randInt(500, 100_000),
+      joinVoice: randInt(0, 5_000),
+      startCall: randInt(0, 2_000),
+      joinCall: randInt(0, 3_000),
+      appOpened: randInt(500, 100_000),
     },
   };
 }
