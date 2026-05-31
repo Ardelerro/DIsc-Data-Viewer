@@ -506,13 +506,14 @@ const ACHIEVEMENT_DEFS: AchievementDef[] = [
       const max = Math.max(...vals);
       return mean > 0 && max / mean >= 5;
     },
-    progress: (d) => {      const vals = monthlyValues(d).filter((v) => v > 0);
+    progress: (d) => {
+      const vals = monthlyValues(d).filter((v) => v > 0);
       if (vals.length === 0) return { current: 0, target: 5 };
       const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
       const max = Math.max(...vals);
       const ratio = mean > 0 ? max / mean : 0;
       return { current: ratio, target: 5 };
-    }
+    },
   },
   {
     id: "ten_thousand_hour_rule",
