@@ -35,30 +35,22 @@ const itemVariants = {
     },
   },
 };
-const StaggeredStatGrid: FC<StaggeredStatGridProps> = ({
-  StatDisplays,
-}) => {
+const StaggeredStatGrid: FC<StaggeredStatGridProps> = ({ StatDisplays }) => {
   return (
-            <div className="border-t border-[var(--color-border)] px-4 py-3 sm:px-5">
-  
-    <motion.div
-      className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 gap-2"
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      viewport={{once: true}}
-      
-    >
-      {StatDisplays.map((stat, i) => (
-        <motion.div key={i} variants={itemVariants}>
-          <Stat
-            icon={stat.icon}
-            label={stat.label}
-            value={stat.value}
-          />
-        </motion.div>
-      ))}
-    </motion.div>
+    <div className="border-t border-[var(--color-border)] px-4 py-3 sm:px-5">
+      <motion.div
+        className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 gap-2"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        viewport={{ once: true }}
+      >
+        {StatDisplays.map((stat, i) => (
+          <motion.div key={i} variants={itemVariants}>
+            <Stat icon={stat.icon} label={stat.label} value={stat.value} />
+          </motion.div>
+        ))}
+      </motion.div>
     </div>
   );
 };
