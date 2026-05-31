@@ -6,7 +6,7 @@ import { SENTIMENT } from "../../config/theme";
 
 const bars = [
   { label: "negative", ...SENTIMENT.negative, direction: "down" as const },
-  { label: "neutral",  ...SENTIMENT.neutral,  direction: "up"   as const },
+  { label: "neutral", ...SENTIMENT.neutral, direction: "up" as const },
   { label: "positive", ...SENTIMENT.positive, direction: "down" as const },
 ] as const;
 
@@ -39,7 +39,7 @@ const SentimentBar: FC<{ sentiment: SentimentStats }> = ({ sentiment }) => {
 
   const counts: Record<string, number> = {
     negative: sentiment.negative,
-    neutral:  sentiment.neutral,
+    neutral: sentiment.neutral,
     positive: sentiment.positive,
   };
 
@@ -47,8 +47,8 @@ const SentimentBar: FC<{ sentiment: SentimentStats }> = ({ sentiment }) => {
     sentiment.average > 5
       ? SENTIMENT.positive.badge
       : sentiment.average < -5
-      ? SENTIMENT.negative.badge
-      : SENTIMENT.neutral.badge;
+        ? SENTIMENT.negative.badge
+        : SENTIMENT.neutral.badge;
 
   return (
     <div className="relative w-full overflow-visible">
@@ -91,7 +91,9 @@ const SentimentBar: FC<{ sentiment: SentimentStats }> = ({ sentiment }) => {
           className="absolute -top-7 transform -translate-x-1/2 z-30"
           style={{ left: `${averageLeft}%`, transition: "left 0.3s ease" }}
         >
-          <span className={`text-sm font-semibold px-2 py-1 rounded-md shadow-md ${badgeClass}`}>
+          <span
+            className={`text-sm font-semibold px-2 py-1 rounded-md shadow-md ${badgeClass}`}
+          >
             {Math.round(sentiment.average)}
           </span>
         </div>
