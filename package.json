@@ -4,14 +4,17 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "predev": "npm run build:wasm",
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build:wasm": "asc assembly/scanner.ts -o src/wasm/scanner.wasm -O3 --runtime stub --use abort= --noAssert && node scripts/embedWasm.mjs",
+    "build": "npm run build:wasm && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.8.1",
     "@radix-ui/react-switch": "^1.2.6",
+    "@streamparser/json": "^0.0.22",
     "@tailwindcss/vite": "^4.1.10",
     "@types/react-router-dom": "^5.3.3",
     "@zip.js/zip.js": "^2.8.8",
@@ -32,6 +35,7 @@
     "@types/react-dom": "^19.1.2",
     "@types/sentiment": "^5.0.4",
     "@vitejs/plugin-react": "^4.4.1",
+    "assemblyscript": "^0.28.17",
     "eslint": "^9.25.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",
