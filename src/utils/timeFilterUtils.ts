@@ -1,5 +1,5 @@
 export type TimePreset = "all" | "7d" | "30d" | "365d" | "custom";
-export type DateRange = { start: string; end: string }; // YYYY-MM-DD
+export type DateRange = { start: string; end: string };
 
 function formatLocalDate(d: Date): string {
   return `${d.getFullYear()}-${(d.getMonth() + 1)
@@ -7,10 +7,9 @@ function formatLocalDate(d: Date): string {
     .padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`;
 }
 
-// anchorDate: YYYY-MM-DD to anchor the window to (e.g. last message date). Defaults to today.
 export function getPresetRange(
   preset: Exclude<TimePreset, "all" | "custom">,
-  anchorDate?: string
+  anchorDate?: string,
 ): DateRange {
   let end: Date;
   if (anchorDate) {
@@ -33,7 +32,7 @@ export function getPresetRange(
 
 function sumDailyInRange(
   daily: Record<string, number>,
-  range: DateRange
+  range: DateRange,
 ): number {
   const { start, end } = range;
   let total = 0;
@@ -43,7 +42,10 @@ function sumDailyInRange(
   return total;
 }
 
-function sumMonthlyInRange(monthly: Record<string, number>, range: DateRange): number {
+function sumMonthlyInRange(
+  monthly: Record<string, number>,
+  range: DateRange,
+): number {
   const startMonth = range.start.slice(0, 7);
   const endMonth = range.end.slice(0, 7);
   let total = 0;
@@ -64,6 +66,21 @@ export function countInRange(
     return sumDailyInRange(stats.daily, range);
   }
   return sumMonthlyInRange(stats.monthly, range);
+}
+
+export function filterHourlyByRange(
+  dailyHourly: Record<string, Record<string, number>>,
+  range: DateRange,
+): Record<string, number> {
+  const { start, end } = range;
+  const result: Record<string, number> = {};
+  for (const [date, hourCounts] of Object.entries(dailyHourly)) {
+    if (date < start || date > end) continue;
+    for (const [h, c] of Object.entries(hourCounts)) {
+      result[h] = (result[h] || 0) + c;
+    }
+  }
+  return result;
 }
 
 export function filterMonthly(

@@ -6,13 +6,16 @@ const H = 1920;
 
 const cardCache = new Map<string, string>();
 
-
 const FALLBACK_AVATAR = `data:image/svg+xml;base64,${btoa('<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><circle cx="128" cy="128" r="128" fill="#5865f2"/><circle cx="128" cy="96" r="52" fill="#fff"/><ellipse cx="128" cy="230" rx="90" ry="72" fill="#fff"/></svg>')}`;
 
-async function avatarToDataUrl(id: string, avatarHash?: string): Promise<string> {
-  const cdnUrl = id && avatarHash
-    ? `/discord-cdn/avatars/${id}/${avatarHash}.png?size=256`
-    : `/discord-cdn/embed/avatars/${Number(id) % 5}.png`;
+async function avatarToDataUrl(
+  id: string,
+  avatarHash?: string,
+): Promise<string> {
+  const cdnUrl =
+    id && avatarHash
+      ? `/discord-cdn/avatars/${id}/${avatarHash}.png?size=256`
+      : `/discord-cdn/embed/avatars/${Number(id) % 5}.png`;
   try {
     const res = await fetch(cdnUrl);
     if (!res.ok) return FALLBACK_AVATAR;
@@ -251,7 +254,7 @@ function card1(data: WrappedCardData, av: string): string {
       canvas.height = CH;
       var ctx = canvas.getContext('2d');
 
-      var placed = []; // {x,y,w,h}[]
+      var placed = []; 
 
       function overlaps(x, y, w, h) {
         var pad = 10;
@@ -446,7 +449,7 @@ export const WRAPPED_CARDS: WrappedCard[] = [
 async function captureCardCached(
   html: string,
   key: string,
-  mode: "preview" | "download"
+  mode: "preview" | "download",
 ): Promise<string> {
   if (cardCache.has(key)) {
     return cardCache.get(key)!;
@@ -507,7 +510,11 @@ export async function previewAllCards(
   const av = await avatarToDataUrl(data.self.id, data.self.avatar_hash);
   const results = [];
   for (const card of WRAPPED_CARDS) {
-    const dataUrl = await captureCardCached(card.buildHTML(data, av),card.id + "preview", "preview");
+    const dataUrl = await captureCardCached(
+      card.buildHTML(data, av),
+      card.id + "preview",
+      "preview",
+    );
     results.push({ id: card.id, label: card.label, bg: card.bg, dataUrl });
   }
   return results;
@@ -521,7 +528,11 @@ export async function downloadWrappedCard(
   const card = WRAPPED_CARDS.find((c) => c.id === cardId);
   if (!card) throw new Error(`Unknown card id: ${cardId}`);
   const av = await avatarToDataUrl(data.self.id, data.self.avatar_hash);
-  const dataUrl = await captureCardCached(card.buildHTML(data, av), cardId + "download", "download");
+  const dataUrl = await captureCardCached(
+    card.buildHTML(data, av),
+    cardId + "download",
+    "download",
+  );
   const a = document.createElement("a");
   a.href = dataUrl;
   a.download = filename ?? `discord-wrapped-${cardId}.png`;
