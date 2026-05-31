@@ -8,7 +8,11 @@ import { BookUser, MessageSquare, Clock, Calendar } from "lucide-react";
 import type { ChannelStats, TopChannel } from "../../types/discord";
 import StaggeredStatGrid from "../stats/StaggeredStatGrid";
 import TimeRangeSelector from "../forms/TimeRangeSelector";
-import { type DateRange, countInRange, filterMonthly } from "../../utils/timeFilterUtils";
+import {
+  type DateRange,
+  countInRange,
+  filterMonthly,
+} from "../../utils/timeFilterUtils";
 import Search from "./Search";
 
 const ServerSearch: FC = () => {
@@ -19,19 +23,22 @@ const ServerSearch: FC = () => {
   const rankedServers = useMemo(() => {
     if (!data) return [];
 
-    const serverTotals = Object.entries(data.serverMapping.serverNames).map(([id, name]) => {
-      const channels = Object.entries(data.serverMapping.channelToServer)
-        .filter(([_, sid]) => sid === id)
-        .map(([channelId]) => data.channelStats[`channel_${channelId}`])
-        .filter(Boolean) as ChannelStats[];
+    const serverTotals = Object.entries(data.serverMapping.serverNames).map(
+      ([id, name]) => {
+        const channels = Object.entries(data.serverMapping.channelToServer)
+          .filter(([_, sid]) => sid === id)
+          .map(([channelId]) => data.channelStats[`channel_${channelId}`])
+          .filter(Boolean) as ChannelStats[];
 
-      const total = channels.reduce(
-        (sum, c) => sum + Object.values(c.hourly || {}).reduce((a, b) => a + b, 0),
-        0,
-      );
+        const total = channels.reduce(
+          (sum, c) =>
+            sum + Object.values(c.hourly || {}).reduce((a, b) => a + b, 0),
+          0,
+        );
 
-      return { id, name, total };
-    });
+        return { id, name, total };
+      },
+    );
 
     serverTotals.sort((a, b) => b.total - a.total);
     return serverTotals.map((s, i) => ({ ...s, rank: i + 1 }));
@@ -48,7 +55,8 @@ const ServerSearch: FC = () => {
   );
 
   const { aggregateData, topChannels } = useMemo(() => {
-    if (!data || !selectedServer) return { aggregateData: null, topChannels: [] };
+    if (!data || !selectedServer)
+      return { aggregateData: null, topChannels: [] };
 
     const channelsInServer = Object.entries(data.serverMapping.channelToServer)
       .filter(([_, sid]) => sid === selectedServer)
@@ -60,7 +68,10 @@ const ServerSearch: FC = () => {
       if (stats) {
         allData.push({
           ...stats,
-          recipientName: data.channelNaming[channelId] || stats.recipientName || `#${channelId}`,
+          recipientName:
+            data.channelNaming[channelId] ||
+            stats.recipientName ||
+            `#${channelId}`,
         });
       }
     }
@@ -92,7 +103,8 @@ const ServerSearch: FC = () => {
   }, [aggregateData, dateRange]);
 
   const filteredMonthly = useMemo(
-    () => (aggregateData ? filterMonthly(aggregateData.monthly, dateRange) : {}),
+    () =>
+      aggregateData ? filterMonthly(aggregateData.monthly, dateRange) : {},
     [aggregateData, dateRange],
   );
 
@@ -121,12 +133,16 @@ const ServerSearch: FC = () => {
     if (!firstTimestamp) return null;
     const first = new Date(firstTimestamp);
     const now = new Date();
-    const diffDays = Math.floor((now.getTime() - first.getTime()) / (1000 * 60 * 60 * 24));
+    const diffDays = Math.floor(
+      (now.getTime() - first.getTime()) / (1000 * 60 * 60 * 24),
+    );
     const years = Math.floor(diffDays / 365);
     const months = Math.floor((diffDays % 365) / 30);
     const weeks = Math.floor((diffDays % 30) / 7);
-    if (years > 1) return `You've been in this server for ${years} years${months > 0 ? ` and ${months} months` : ""}.`;
-    if (years === 1) return `You've been in this server for 1 year${months > 0 ? ` and ${months} months` : ""}.`;
+    if (years > 1)
+      return `You've been in this server for ${years} years${months > 0 ? ` and ${months} months` : ""}.`;
+    if (years === 1)
+      return `You've been in this server for 1 year${months > 0 ? ` and ${months} months` : ""}.`;
     if (months > 2) return `You've been in this server for ${months} months.`;
     if (months >= 1) return `You've been in this server for about a month.`;
     if (weeks > 1) return `You've been in this server for ${weeks} weeks.`;
@@ -147,7 +163,9 @@ const ServerSearch: FC = () => {
       .map((c) => c.firstMessageTimestamp)
       .filter((ts): ts is string => Boolean(ts));
 
-    return timestamps.sort((a, b) => new Date(a).getTime() - new Date(b).getTime())[0];
+    return timestamps.sort(
+      (a, b) => new Date(a).getTime() - new Date(b).getTime(),
+    )[0];
   }
 
   return (
@@ -182,29 +200,52 @@ const ServerSearch: FC = () => {
           className="space-y-8"
         >
           <div>
-            <h2 className="text-2xl font-semibold text-[var(--color-text-1)]">{selectedName}</h2>
+            <h2 className="text-2xl font-semibold text-[var(--color-text-1)]">
+              {selectedName}
+            </h2>
             <p className="text-sm text-[var(--color-text-3)]">
               Rank #{serverRank} —{" "}
-              {getAllianceDurationMessage(getFirstTimestampFromChannels() || undefined) ||
-                "No messages found in this server."}
+              {getAllianceDurationMessage(
+                getFirstTimestampFromChannels() || undefined,
+              ) || "No messages found in this server."}
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <TimeRangeSelector hasDaily={false} anchorDate={lastDataDate} onChange={setDateRange} />
+            <TimeRangeSelector
+              hasDaily={false}
+              anchorDate={lastDataDate}
+              onChange={setDateRange}
+            />
           </div>
 
-          <StaggeredStatGrid StatDisplays={[
-            { icon: <MessageSquare />, label: "Total Messages", value: totalMessages.toLocaleString() },
-            { icon: <Clock />, label: "Active Channels", value: topChannels.length.toLocaleString() },
-            { icon: <Calendar />, label: "Months Active", value: Object.keys(filteredMonthly).length.toString() },
-          ]} />
+          <StaggeredStatGrid
+            StatDisplays={[
+              {
+                icon: <MessageSquare />,
+                label: "Total Messages",
+                value: totalMessages.toLocaleString(),
+              },
+              {
+                icon: <Clock />,
+                label: "Active Channels",
+                value: topChannels.length.toLocaleString(),
+              },
+              {
+                icon: <Calendar />,
+                label: "Months Active",
+                value: Object.keys(filteredMonthly).length.toString(),
+              },
+            ]}
+          />
 
           <HourlyChart data={aggregateData.hourly} />
           <MonthlyChart data={filteredMonthly} />
 
           <div>
-            <h3 className="text-lg font-semibold text-[var(--color-text-1)] mb-4">Top Channels</h3>
+            <h3 className="text-lg font-semibold text-[var(--color-text-1)] mb-4">
+              Top Channels
+            </h3>
             <div className="overflow-x-auto">
               <table className="min-w-full table-auto text-sm text-[var(--color-text-1)]">
                 <thead>
@@ -221,7 +262,9 @@ const ServerSearch: FC = () => {
                       className="hover:bg-[var(--color-accent-soft)] transition-colors cursor-pointer"
                       whileHover={{ scale: 1.01 }}
                     >
-                      <td className="px-6 py-3 font-semibold text-[var(--color-text-2)]">#{i + 1}</td>
+                      <td className="px-6 py-3 font-semibold text-[var(--color-text-2)]">
+                        #{i + 1}
+                      </td>
                       <td className="px-6 py-3">{c.name}</td>
                       <td className="px-6 py-3 text-[var(--color-accent)] font-medium">
                         {c.totalMessages.toLocaleString()}

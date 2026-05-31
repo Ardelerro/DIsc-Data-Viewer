@@ -9,7 +9,13 @@ interface SearchProps {
   children: ReactNode;
 }
 
-const Search: FC<SearchProps> = ({ icon, title, subtitle, animationKey, children }) => {
+const Search: FC<SearchProps> = ({
+  icon,
+  title,
+  subtitle,
+  animationKey,
+  children,
+}) => {
   return (
     <div className="max-w-5xl mx-auto px-4">
       <motion.div
@@ -24,7 +30,9 @@ const Search: FC<SearchProps> = ({ icon, title, subtitle, animationKey, children
             {icon}
           </div>
           <div>
-            <h1 className="text-xl font-bold text-[var(--color-text-1)]">{title}</h1>
+            <h1 className="text-xl font-bold text-[var(--color-text-1)]">
+              {title}
+            </h1>
             <p className="text-sm text-[var(--color-text-3)]">{subtitle}</p>
           </div>
         </div>
