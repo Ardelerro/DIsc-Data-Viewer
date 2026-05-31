@@ -1,4 +1,3 @@
-
 export type SentimentClass = "positive" | "negative" | "neutral";
 
 export const POS_THRESHOLD = 0.05;
