@@ -6,12 +6,9 @@ import React, {
   type FC,
   useMemo,
 } from "react";
-import {
-  BlobReader,
-  ZipReader,
-  configure,
-} from "@zip.js/zip.js";
+import { configure } from "@zip.js/zip.js";
 import type {
+  ActivityStats,
   DataContextType,
   ProcessedData,
   UploadOptions,
@@ -26,36 +23,28 @@ import {
   getData as loadStoredData,
   saveData as persistData,
   clearData as clearStoredData,
+  saveProfile,
 } from "../services/dataStore";
+import { Profiler, logReport, type ProfileReport } from "../services/profiler";
 
 configure({ useWebWorkers: true });
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
+
+const ZERO_ACTIVITY: ActivityStats = {
+  addReaction: 0,
+  attachmentsSent: 0,
+  joinVoice: 0,
+  startCall: 0,
+  joinCall: 0,
+  appOpened: 0,
+};
 
 export const useData = () => {
   const context = useContext(DataContext);
   if (!context) throw new Error("useData must be used within DataProvider");
   return context;
 };
-
-async function validatePackageStructure(file: File | Blob) {
-  const reader = new ZipReader(new BlobReader(file));
-  try {
-    const entries = await reader.getEntries();
-    let hasAccount = false;
-    let hasMessages = false;
-    for (const e of entries) {
-      if (!hasAccount && /^Account\//i.test(e.filename)) hasAccount = true;
-      if (!hasMessages && /^Messages\//i.test(e.filename)) hasMessages = true;
-      if (hasAccount && hasMessages) break;
-    }
-    if (!hasAccount || !hasMessages) {
-      throw new Error("Invalid package structure");
-    }
-  } finally {
-    await reader.close();
-  }
-}
 
 function applySentiment(
   data: ProcessedData,
@@ -90,8 +79,9 @@ export const DataProvider: FC<{ children: React.ReactNode }> = ({
   const [data, setData] = useState<ProcessedData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activityProgress, setActivityProgress] = useState<number | null>(null);
 
-const [hydrating, setHydrating] = useState(true);
+  const [hydrating, setHydrating] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -116,23 +106,27 @@ const [hydrating, setHydrating] = useState(true);
     setIsLoading(true);
     setError(null);
 
-    try {
-      await validatePackageStructure(file);
+    const prof = new Profiler();
+    const stopTotal = prof.start("total");
 
-     const useAI = options.aiSentiment;
+    const stopPerceived = prof.start("orchestrator:perceived");
+
+    try {
+      const useAI = options.aiSentiment;
       let msgPct = 0;
-      let actPct = 0;
       let sentPct = 0;
-      // AI sentiment dominates compute when enabled, so it carries most weight.
-      const wMsg = useAI ? 0.3 : 0.8;
-      const wAct = useAI ? 0.1 : 0.2;
+
+      const wMsg = useAI ? 0.4 : 1;
       const wSent = useAI ? 0.6 : 0;
       const report = () => {
-        const combined = msgPct * wMsg + actPct * wAct + sentPct * wSent;
+        const combined = msgPct * wMsg + sentPct * wSent;
         onProgress?.(Math.min(99, combined), "Processing your data...");
       };
 
-     const sentimentPromise: Promise<SentimentResult | null> = useAI
+      let resolveReady!: (ok: boolean) => void;
+      const modelReady = new Promise<boolean>((res) => (resolveReady = res));
+
+      const sentimentPromise: Promise<SentimentResult | null> = useAI
         ? processSentiment(
             file,
             options.sampleRate,
@@ -141,14 +135,32 @@ const [hydrating, setHydrating] = useState(true);
               report();
             },
             signal,
+            () => resolveReady(true),
+            prof,
           ).catch((err) => {
+            resolveReady(false);
             if (err instanceof Error && err.name === "AbortError") throw err;
             console.error("AI sentiment failed; using lexicon sentiment:", err);
             return null;
           })
         : Promise.resolve(null);
 
-      const [processed, activityStats, sentimentResult] = await Promise.all([
+      setActivityProgress(0);
+      const activityPromise = processActivities(
+        file,
+        (p) => setActivityProgress(p),
+        signal,
+        prof,
+      );
+
+      activityPromise.catch(() => {});
+
+      const stopModelWait = prof.start("orchestrator:modelReadyWait");
+      const aiMode = useAI ? await modelReady : false;
+      stopModelWait();
+
+      const stopPromiseAll = prof.start("orchestrator:promiseAll");
+      const [processed, sentimentResult] = await Promise.all([
         processZipData(
           file,
           (p) => {
@@ -156,21 +168,17 @@ const [hydrating, setHydrating] = useState(true);
             report();
           },
           signal,
-        ),
-        processActivities(
-          file,
-          (p) => {
-            actPct = p;
-            report();
-          },
-          signal,
+          aiMode,
+          prof,
         ),
         sentimentPromise,
       ]);
+      stopPromiseAll();
 
       const fullData: ProcessedData = {
         ...processed,
-        activityStats,
+        activityStats: { ...ZERO_ACTIVITY },
+        activityPending: true,
         sentimentMethod: useAI && sentimentResult ? "ai" : "lexicon",
       };
       if (useAI && sentimentResult) {
@@ -181,12 +189,62 @@ const [hydrating, setHydrating] = useState(true);
       setData(fullData);
 
       try {
-        await persistData(fullData);
+        await prof.timeAsync("orchestrator:persist", () =>
+          persistData(fullData),
+        );
       } catch (err) {
         console.error("Failed to persist processed data:", err);
       }
 
       onProgress?.(100, "Complete!");
+
+      stopPerceived();
+
+      const finalizeProfile = () => {
+        stopTotal();
+        const buckets = prof.export();
+        const profileReport: ProfileReport = {
+          timestamp: Date.now(),
+          dateISO: new Date().toISOString(),
+          fileSizeBytes: file.size,
+          aiMode,
+          sampleRate: options.sampleRate,
+          messageCount: fullData.aggregateStats.messageCount,
+
+          workerCount: buckets["zip/msgworker/init:getEntries"]?.count ?? 0,
+          totalMs: buckets["total"]?.totalMs ?? 0,
+          buckets,
+        };
+        logReport(profileReport);
+        void saveProfile(profileReport);
+      };
+
+      activityPromise
+        .then(async (activityStats) => {
+          setActivityProgress(null);
+          const patched: ProcessedData = {
+            ...fullData,
+            activityStats,
+            activityPending: false,
+          };
+          setData(patched);
+          try {
+            await persistData(patched);
+          } catch (err) {
+            console.error("Failed to persist activity stats:", err);
+          }
+          finalizeProfile();
+        })
+        .catch((err) => {
+          setActivityProgress(null);
+          if (err instanceof Error && err.name === "AbortError") return;
+          console.error(
+            "Activity processing failed; counts left at zero:",
+            err,
+          );
+          setData({ ...fullData, activityPending: false });
+          finalizeProfile();
+        });
     } catch (err) {
       if (!(err instanceof Error && err.name === "AbortError")) {
         setError(err instanceof Error ? err.message : "Unknown error");
@@ -202,12 +260,18 @@ const [hydrating, setHydrating] = useState(true);
     void clearStoredData();
   };
   const contextValue = useMemo(
-    () => ({ data, isLoading, error, hydrating, uploadData, clearData }),
-    [data, isLoading, error, hydrating],
+    () => ({
+      data,
+      isLoading,
+      error,
+      hydrating,
+      activityProgress,
+      uploadData,
+      clearData,
+    }),
+    [data, isLoading, error, hydrating, activityProgress],
   );
   return (
-    <DataContext.Provider value={contextValue}>
-      {children}
-    </DataContext.Provider>
+    <DataContext.Provider value={contextValue}>{children}</DataContext.Provider>
   );
 };
