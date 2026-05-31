@@ -1,5 +1,16 @@
 {
+  "headers": [
+    {
+      "source": "/discord-cdn/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=86400, immutable" }
+      ]
+    }
+  ],
   "rewrites": [
-    { "source": "/discord-cdn/(.*)", "destination": "https://cdn.discordapp.com/$1" }
+    {
+      "source": "/discord-cdn/(.*)",
+      "destination": "https://cdn.discordapp.com/$1"
+    }
   ]
 }
