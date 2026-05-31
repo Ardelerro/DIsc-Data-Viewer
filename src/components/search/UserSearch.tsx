@@ -4,7 +4,16 @@ import HourlyChart from "../charts/HourlyChart";
 import MonthlyChart from "../charts/MonthlyChart";
 import { motion } from "framer-motion";
 import { useData } from "../../context/DataContext";
-import { User, MessageSquare, Clock, Calendar, Settings, Flame, Sun, CalendarCheck } from "lucide-react";
+import {
+  User,
+  MessageSquare,
+  Clock,
+  Calendar,
+  Settings,
+  Flame,
+  Sun,
+  CalendarCheck,
+} from "lucide-react";
 import SentimentBar from "../charts/SentimentBar";
 import type { ChannelStats } from "../../types/discord";
 import SettingsModal from "../displays/SettingsDisplay";
@@ -12,13 +21,19 @@ import StaggeredStatGrid from "../stats/StaggeredStatGrid";
 import UserCombobox from "../forms/UserComboBox";
 import Avatar from "../Avatar";
 import TimeRangeSelector from "../forms/TimeRangeSelector";
-import { type DateRange, countInRange, filterMonthly } from "../../utils/timeFilterUtils";
+import {
+  type DateRange,
+  countInRange,
+  filterMonthly,
+} from "../../utils/timeFilterUtils";
 import Search from "./Search";
 
 const UserSearch: FC = () => {
   const { data } = useData();
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
-  const [rankingType, setRankingType] = useState<"messages" | "sentiment">("messages");
+  const [rankingType, setRankingType] = useState<"messages" | "sentiment">(
+    "messages",
+  );
   const [minMessages, setMinMessages] = useState<number>(100);
   const [showSettings, setShowSettings] = useState(false);
   const [showElements, setShowElements] = useState({
@@ -31,9 +46,15 @@ const UserSearch: FC = () => {
   const rankedUsers = useMemo(() => {
     if (!data) return [];
 
-    const usernameToUser: Record<string, { userId: string; avatarHash?: string }> = {};
+    const usernameToUser: Record<
+      string,
+      { userId: string; avatarHash?: string }
+    > = {};
     for (const [userId, info] of Object.entries(data.userMapping || {})) {
-      usernameToUser[info.username] = { userId, avatarHash: info.avatar || undefined };
+      usernameToUser[info.username] = {
+        userId,
+        avatarHash: info.avatar || undefined,
+      };
     }
 
     let users: {
@@ -50,17 +71,33 @@ const UserSearch: FC = () => {
         .filter(([key]) => key.startsWith("dm_"))
         .filter(([_, entry]) => entry.recipientName)
         .map(([key, entry]) => {
-          const total = Object.values(entry.hourly || {}).reduce((sum, c) => sum + c, 0);
-          const mapped = entry.recipientName ? usernameToUser[entry.recipientName] : undefined;
-          return { key, userId: mapped?.userId, avatarHash: mapped?.avatarHash, name: entry.recipientName, total };
+          const total = Object.values(entry.hourly || {}).reduce(
+            (sum, c) => sum + c,
+            0,
+          );
+          const mapped = entry.recipientName
+            ? usernameToUser[entry.recipientName]
+            : undefined;
+          return {
+            key,
+            userId: mapped?.userId,
+            avatarHash: mapped?.avatarHash,
+            name: entry.recipientName,
+            total,
+          };
         });
     } else {
       users = Object.entries(data.channelStats)
         .filter(([key]) => key.startsWith("dm_"))
         .filter(([_, entry]) => entry.recipientName)
         .map(([key, entry]) => {
-          const messageCount = Object.values(entry.hourly || {}).reduce((sum, c) => sum + c, 0);
-          const mapped = entry.recipientName ? usernameToUser[entry.recipientName] : undefined;
+          const messageCount = Object.values(entry.hourly || {}).reduce(
+            (sum, c) => sum + c,
+            0,
+          );
+          const mapped = entry.recipientName
+            ? usernameToUser[entry.recipientName]
+            : undefined;
           return {
             key,
             userId: mapped?.userId,
@@ -92,7 +129,9 @@ const UserSearch: FC = () => {
     [channelData, dateRange],
   );
 
-  const hasDaily = !!(channelData?.daily && Object.keys(channelData.daily).length > 0);
+  const hasDaily = !!(
+    channelData?.daily && Object.keys(channelData.daily).length > 0
+  );
   const lastDataDate = useMemo(() => {
     if (!channelData) return undefined;
     const keys = [
@@ -108,7 +147,13 @@ const UserSearch: FC = () => {
     if (!entries.length) return null;
     const [hour] = entries.reduce((max, cur) => (cur[1] > max[1] ? cur : max));
     const h = parseInt(hour, 10);
-    return h === 0 ? "12 AM" : h < 12 ? `${h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`;
+    return h === 0
+      ? "12 AM"
+      : h < 12
+        ? `${h} AM`
+        : h === 12
+          ? "12 PM"
+          : `${h - 12} PM`;
   }, [channelData]);
 
   const lastMessaged = useMemo(() => {
@@ -118,7 +163,10 @@ const UserSearch: FC = () => {
     const sorted = keys.sort();
     const latest = sorted[sorted.length - 1];
     const [year, month] = latest.split("-");
-    return new Date(parseInt(year), parseInt(month) - 1).toLocaleDateString(undefined, { month: "short", year: "numeric" });
+    return new Date(parseInt(year), parseInt(month) - 1).toLocaleDateString(
+      undefined,
+      { month: "short", year: "numeric" },
+    );
   }, [channelData]);
 
   const selectedUserInfo = useMemo(() => {
@@ -134,16 +182,22 @@ const UserSearch: FC = () => {
       </div>
     );
 
-  function getFriendshipDurationMessage(firstTimestamp?: string | null): string | null {
+  function getFriendshipDurationMessage(
+    firstTimestamp?: string | null,
+  ): string | null {
     if (!firstTimestamp) return null;
     const first = new Date(firstTimestamp);
     const now = new Date();
-    const diffDays = Math.floor((now.getTime() - first.getTime()) / (1000 * 60 * 60 * 24));
+    const diffDays = Math.floor(
+      (now.getTime() - first.getTime()) / (1000 * 60 * 60 * 24),
+    );
     const years = Math.floor(diffDays / 365);
     const months = Math.floor((diffDays % 365) / 30);
     const weeks = Math.floor((diffDays % 30) / 7);
-    if (years > 1) return `You've known them for ${years} years${months > 0 ? ` and ${months} months` : ""}.`;
-    if (years === 1) return `You've known them for 1 year${months > 0 ? ` and ${months} months` : ""}.`;
+    if (years > 1)
+      return `You've known them for ${years} years${months > 0 ? ` and ${months} months` : ""}.`;
+    if (years === 1)
+      return `You've known them for 1 year${months > 0 ? ` and ${months} months` : ""}.`;
     if (months > 2) return `You've known them for ${months} months.`;
     if (months >= 1) return `You've known them for about a month.`;
     if (weeks > 1) return `You've known them for ${weeks} weeks.`;
@@ -154,12 +208,39 @@ const UserSearch: FC = () => {
   }
 
   const UserStatDisplays = [
-    { icon: <MessageSquare />, label: "Total Messages", value: totalMessages.toLocaleString() },
-    { icon: <Clock />, label: "Avg. Gap (min) | Avg. Conversation Time (min)", value: channelData?.averageGapBetweenMessages ? `${Math.round(channelData.averageGapBetweenMessages / 60)} | ${Math.round(channelData.averageConversationTime! / 60)}` : "N/A" },
-    { icon: <Calendar />, label: "First Message", value: channelData?.firstMessageTimestamp ? new Date(channelData.firstMessageTimestamp).toLocaleDateString() : "N/A" },
-    { icon: <Flame />, label: "Longest Streak (days)", value: channelData?.longestStreak != null && channelData.longestStreak > 0 ? channelData.longestStreak.toLocaleString() : "N/A" },
+    {
+      icon: <MessageSquare />,
+      label: "Total Messages",
+      value: totalMessages.toLocaleString(),
+    },
+    {
+      icon: <Clock />,
+      label: "Avg. Gap (min) | Avg. Conversation Time (min)",
+      value: channelData?.averageGapBetweenMessages
+        ? `${Math.round(channelData.averageGapBetweenMessages / 60)} | ${Math.round(channelData.averageConversationTime! / 60)}`
+        : "N/A",
+    },
+    {
+      icon: <Calendar />,
+      label: "First Message",
+      value: channelData?.firstMessageTimestamp
+        ? new Date(channelData.firstMessageTimestamp).toLocaleDateString()
+        : "N/A",
+    },
+    {
+      icon: <Flame />,
+      label: "Longest Streak (days)",
+      value:
+        channelData?.longestStreak != null && channelData.longestStreak > 0
+          ? channelData.longestStreak.toLocaleString()
+          : "N/A",
+    },
     { icon: <Sun />, label: "Most Active Hour", value: peakHour ?? "N/A" },
-    { icon: <CalendarCheck />, label: "Last Messaged", value: lastMessaged ?? "N/A" },
+    {
+      icon: <CalendarCheck />,
+      label: "Last Messaged",
+      value: lastMessaged ?? "N/A",
+    },
   ];
 
   const icon = selectedUserInfo ? (
@@ -190,7 +271,9 @@ const UserSearch: FC = () => {
           </div>
           <select
             value={rankingType}
-            onChange={(e) => setRankingType(e.target.value as "messages" | "sentiment")}
+            onChange={(e) =>
+              setRankingType(e.target.value as "messages" | "sentiment")
+            }
             className="px-3 py-2 rounded-lg text-sm bg-[var(--color-surface-raised)] border border-[var(--color-border-solid)] text-[var(--color-text-1)]"
           >
             <option value="messages">Rank by Messages</option>
@@ -232,7 +315,10 @@ const UserSearch: FC = () => {
                 {channelData.recipientName}
               </h2>
               <p className="text-sm text-[var(--color-text-3)]">
-                Rank #{userRank} — {getFriendshipDurationMessage(channelData.firstMessageTimestamp)}
+                Rank #{userRank} —{" "}
+                {getFriendshipDurationMessage(
+                  channelData.firstMessageTimestamp,
+                )}
               </p>
             </div>
 
@@ -248,7 +334,11 @@ const UserSearch: FC = () => {
             )}
 
             <div className="flex flex-wrap items-center gap-2">
-              <TimeRangeSelector hasDaily={hasDaily} anchorDate={lastDataDate} onChange={setDateRange} />
+              <TimeRangeSelector
+                hasDaily={hasDaily}
+                anchorDate={lastDataDate}
+                onChange={setDateRange}
+              />
             </div>
 
             {showElements.hourly && <HourlyChart data={channelData.hourly} />}
