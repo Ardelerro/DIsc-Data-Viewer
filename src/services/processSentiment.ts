@@ -1,4 +1,5 @@
 import SentimentWorker from "./sentiment.worker.ts?worker";
+import { Profiler } from "./profiler";
 import type {
   SentimentWorkerResponse,
   ChannelSentiment,
@@ -10,17 +11,17 @@ export interface SentimentResult {
   hourlyAnalyzedCount: Record<string, number>;
 }
 
-
 export function isWebGPUAvailable(): boolean {
   return typeof navigator !== "undefined" && "gpu" in navigator;
 }
-
 
 function processSentiment(
   file: File | Blob,
   sampleRate: number,
   onProgress?: (progress: number) => void,
   signal?: AbortSignal,
+  onReady?: () => void,
+  prof: Profiler = new Profiler(),
 ): Promise<SentimentResult> {
   return new Promise<SentimentResult>((resolve, reject) => {
     const worker = new SentimentWorker();
@@ -52,7 +53,10 @@ function processSentiment(
       if (!m || settled) return;
       if (m.type === "progress") {
         onProgress?.(m.value);
+      } else if (m.type === "ready") {
+        onReady?.();
       } else if (m.type === "result") {
+        prof.merge(m.profile, "sentiment/");
         finish(() =>
           resolve({
             channels: m.channels,

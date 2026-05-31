@@ -5,7 +5,8 @@ import {
   type FileEntry,
 } from "@zip.js/zip.js";
 import { pipeline, env } from "@huggingface/transformers";
-import { createObjectStreamParser, parseTimestamp } from "./messageStream";
+import { createStreamParser, parseTimestamp } from "./messageStream";
+import { Profiler } from "./profiler";
 import {
   classifyCompound,
   compoundToScore,
@@ -19,9 +20,7 @@ import type {
 
 configure({ useWebWorkers: false });
 
-
 env.allowLocalModels = false;
-
 
 const MODEL_ID = "Xenova/twitter-roberta-base-sentiment-latest";
 const BATCH_SIZE = 32;
@@ -30,6 +29,8 @@ const MAX_TEXT_LEN = 1200;
 
 const post = (m: SentimentWorkerResponse) =>
   (postMessage as (m: SentimentWorkerResponse) => void)(m);
+
+const prof = new Profiler();
 
 function countWords(s: string): number {
   const m = s.match(/\S+/g);
@@ -64,12 +65,11 @@ function reportProgress(value: number) {
   post({ type: "progress", value: v });
 }
 
-
 async function loadModel(): Promise<Classifier> {
   const pipe = await pipeline("sentiment-analysis", MODEL_ID, {
     device: "webgpu",
     dtype: "fp16",
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     progress_callback: (p: any) => {
       if (p && p.status === "progress" && typeof p.progress === "number") {
         reportProgress(p.progress * 0.1);
@@ -79,16 +79,15 @@ async function loadModel(): Promise<Classifier> {
   return pipe as unknown as Classifier;
 }
 
-
 interface SentAcc {
   pos: number;
   neg: number;
   neu: number;
-  
+
   avgSum: number;
   weightSum: number;
   hourlySentiment: Record<string, number>;
-  hourlyWeight: Record<string, number>; 
+  hourlyWeight: Record<string, number>;
   sampleAcc: number;
 }
 
@@ -105,7 +104,6 @@ function createAcc(): SentAcc {
   };
 }
 
-
 function scoreOf(entries: ClassPrediction[]): number {
   let pPos = 0;
   let pNeg = 0;
@@ -121,11 +119,13 @@ function scoreOf(entries: ClassPrediction[]): number {
 }
 
 async function run(file: File | Blob, sampleRate: number) {
-  const classifier = await loadModel();
+  const classifier = await prof.timeAsync("loadModel", () => loadModel());
+
+  post({ type: "ready" });
   reportProgress(10);
 
   const reader = new ZipReader(new BlobReader(file));
-  const entries = await reader.getEntries();
+  const entries = await prof.timeAsync("getEntries", () => reader.getEntries());
 
   const messageEntries: FileEntry[] = [];
   for (const e of entries) {
@@ -176,7 +176,6 @@ async function run(file: File | Blob, sampleRate: number) {
       }
     }
 
-    // Always count the file's full byte weight so the bar reaches 100%.
     const counted = processedBytes - before;
     if (counted < full) {
       processedBytes += full - counted;
@@ -186,7 +185,13 @@ async function run(file: File | Blob, sampleRate: number) {
 
   await reader.close();
   reportProgress(100);
-  post({ type: "result", channels, hourlySentimentTotal, hourlyAnalyzedCount });
+  post({
+    type: "result",
+    channels,
+    hourlySentimentTotal,
+    hourlyAnalyzedCount,
+    profile: prof.export(),
+  });
 }
 
 async function processEntry(
@@ -196,7 +201,6 @@ async function processEntry(
   classifier: Classifier,
   reportDelta: (bytes: number) => void,
 ) {
-  const decoder = new TextDecoder("utf-8", { fatal: false });
   const batchText: string[] = [];
   const batchHour: string[] = [];
   const batchLen: number[] = [];
@@ -207,7 +211,9 @@ async function processEntry(
     const texts = batchText.splice(0, n);
     const hours = batchHour.splice(0, n);
     const lens = batchLen.splice(0, n);
-    const out = await classifier(texts, { top_k: 3 });
+    const out = await prof.timeAsync("inference:classifier", () =>
+      classifier(texts, { top_k: 3 }),
+    );
     for (let i = 0; i < texts.length; i++) {
       const compound = scoreOf(out[i]);
       const score = compoundToScore(compound);
@@ -225,41 +231,33 @@ async function processEntry(
     }
   };
 
-  const parser = createObjectStreamParser((objText) => {
-    try {
-      const obj = JSON.parse(objText) as {
-        Timestamp?: unknown;
-        Contents?: unknown;
-      };
-      if (!obj || !obj.Timestamp) return;
-      const contents = obj.Contents;
-      if (typeof contents !== "string") return;
-      const text = contents.trim();
-      if (text.length < 2) return;
-      acc.sampleAcc += sampleRate;
-      if (acc.sampleAcc < 1) return;
-      acc.sampleAcc -= 1;
-      const parsed = parseTimestamp(String(obj.Timestamp));
-      if (!parsed) return;
-      batchText.push(
-        text.length > MAX_TEXT_LEN ? text.slice(0, MAX_TEXT_LEN) : text,
-      );
-      batchHour.push(parsed.hour);
-      batchLen.push(countWords(text));
-    } catch {
-      /* skip a malformed object rather than failing the whole file */
-    }
+  const parser = createStreamParser((obj) => {
+    if (!obj.Timestamp) return;
+    const contents = obj.Contents;
+    if (typeof contents !== "string") return;
+    const text = contents.trim();
+    if (text.length < 2) return;
+    acc.sampleAcc += sampleRate;
+    if (acc.sampleAcc < 1) return;
+    acc.sampleAcc -= 1;
+    const parsed = parseTimestamp(String(obj.Timestamp));
+    if (!parsed) return;
+    batchText.push(
+      text.length > MAX_TEXT_LEN ? text.slice(0, MAX_TEXT_LEN) : text,
+    );
+    batchHour.push(parsed.hour);
+    batchLen.push(countWords(text));
   });
 
   const writable = new WritableStream<Uint8Array>({
     async write(chunk) {
-      parser.feed(decoder.decode(chunk, { stream: true }));
+      const t0 = performance.now();
+      parser.feed(chunk);
+      prof.record("stream:parse+sample", performance.now() - t0);
       while (batchText.length >= BATCH_SIZE) await runBatch();
       reportDelta(chunk.byteLength);
     },
     async close() {
-      const tail = decoder.decode();
-      if (tail) parser.feed(tail);
       while (batchText.length > 0) await runBatch();
     },
   });
