@@ -1,5 +1,5 @@
 import type { FC } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useData } from "../../context/DataContext";
 import {
   User,
@@ -15,7 +15,7 @@ import {
   Globe,
   UserRound,
 } from "lucide-react";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { computePersonality } from "../../achievements/computePersonality";
 import {
   computeAchievements,
@@ -28,9 +28,20 @@ import PersonalityBadge from "../../achievements/PersonalityBadge";
 import StaggeredStatGrid from "../stats/StaggeredStatGrid";
 import Avatar from "../Avatar";
 
+function formatEta(ms: number): string {
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `~${s}s`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return rem > 0 ? `~${m}m ${rem}s` : `~${m}m`;
+}
+
 const SelfDisplay: FC = () => {
-  const { data } = useData();
+  const { data, activityProgress } = useData();
   const [shouldAnimateAchs, setShouldAnimateAchs] = useState(false);
+  const [achsAnimating, setAchsAnimating] = useState(false);
+  const [etaMs, setEtaMs] = useState<number | null>(null);
+  const activityStartRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!data) return;
@@ -67,6 +78,32 @@ const SelfDisplay: FC = () => {
   );
   const displayAchs = [...unlockedAchs, ...lockedAchs];
 
+  useEffect(() => {
+    if (activityProgress === null) {
+      activityStartRef.current = null;
+      setEtaMs(null);
+      return;
+    }
+    if (activityStartRef.current === null)
+      activityStartRef.current = Date.now();
+    const elapsed = Date.now() - activityStartRef.current;
+    const p = activityProgress;
+    if (p > 2 && elapsed > 400) {
+      setEtaMs((elapsed / p) * (100 - p));
+    } else {
+      setEtaMs(null);
+    }
+  }, [activityProgress]);
+
+  useEffect(() => {
+    if (!shouldAnimateAchs || unlockedAchs.length === 0) return;
+    setAchsAnimating(true);
+
+    const totalMs = unlockedAchs.length * 80 + 700;
+    const id = setTimeout(() => setAchsAnimating(false), totalMs);
+    return () => clearTimeout(id);
+  }, [shouldAnimateAchs, unlockedAchs.length]);
+
   if (!data) {
     return (
       <div className="px-4 text-center py-8 text-xs text-[var(--color-text-3)]">
@@ -90,7 +127,7 @@ const SelfDisplay: FC = () => {
   const totalChannels = Object.keys(channelStats).length;
   let minDate = Infinity;
   let maxDate = -Infinity;
-  // Avg unique DM conversations per day
+
   const dmChannelsPerDay = new Map<string, Set<string>>();
   for (const [key, stats] of Object.entries(channelStats)) {
     if (!key.startsWith("dm_")) continue;
@@ -104,33 +141,56 @@ const SelfDisplay: FC = () => {
   const dmDayCount = dmChannelsPerDay.size;
   let dmChannelDaySum = 0;
   for (const s of dmChannelsPerDay.values()) dmChannelDaySum += s.size;
-  const avgPeoplePerDay = dmDayCount > 0 ? (dmChannelDaySum / dmDayCount).toFixed(1) : "0";
+  const avgPeoplePerDay =
+    dmDayCount > 0 ? (dmChannelDaySum / dmDayCount).toFixed(1) : "0";
 
   const totalServers = Object.keys(data.serverMapping.serverNames).length;
   const daysActiveCount = Object.keys(aggregateStats.daily || {}).filter(
     (d) => (aggregateStats.daily![d] ?? 0) > 0,
   ).length;
 
-  const ActivityIcons = [<Paperclip />, <Smile />, <Headphones />, <PhoneCall />, <Monitor />, <BookUser />, <UserRound />, <Globe />, <CalendarDays />];
-  const ActivityLabels = ["Attachments sent", "Reactions added", "Voice channels joined", "DM calls", "Discord opened", "Total channels", "Avg. people/day", "Total servers", "Days active"]
+  const ActivityIcons = [
+    <Paperclip />,
+    <Smile />,
+    <Headphones />,
+    <PhoneCall />,
+    <Monitor />,
+    <BookUser />,
+    <UserRound />,
+    <Globe />,
+    <CalendarDays />,
+  ];
+  const ActivityLabels = [
+    "Attachments sent",
+    "Reactions added",
+    "Voice channels joined",
+    "DM calls",
+    "Discord opened",
+    "Total channels",
+    "Avg. people/day",
+    "Total servers",
+    "Days active",
+  ];
+
+  const actPending = data.activityPending === true;
+  const av = (n: number) => (actPending ? "…" : n);
   const ActivityStats = [
-    data.activityStats.attachmentsSent,
-    data.activityStats.addReaction,
-    data.activityStats.joinVoice,
-    data.activityStats.joinCall,
-    data.activityStats.appOpened,
+    av(data.activityStats.attachmentsSent),
+    av(data.activityStats.addReaction),
+    av(data.activityStats.joinVoice),
+    av(data.activityStats.joinCall),
+    av(data.activityStats.appOpened),
     totalChannels,
     avgPeoplePerDay,
     totalServers,
     daysActiveCount,
-  ]
-  const ActivityStatDisplays=ActivityIcons.map((icon, index) => ({
+  ];
+  const ActivityStatDisplays = ActivityIcons.map((icon, index) => ({
     icon: icon,
     label: ActivityLabels[index],
-    value: ActivityStats[index]
-  }))
+    value: ActivityStats[index],
+  }));
 
-  
   for (const key in channelStats) {
     const stats = channelStats[key];
     for (const month in stats.monthly) {
@@ -169,7 +229,7 @@ const SelfDisplay: FC = () => {
   const CoreStatDisplays = CoreStatIcons.map((icon, index) => ({
     icon: icon,
     label: CoreStatLabels[index],
-    value: CoreStats[index]
+    value: CoreStats[index],
   }));
   return (
     <motion.div
@@ -206,23 +266,70 @@ const SelfDisplay: FC = () => {
             {personality?.tagline ?? "Your overall activity overview"}
           </p>
         </div>
+
+        <AnimatePresence>
+          {actPending && (
+            <motion.div
+              key="activity-eta"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 0.2 }}
+              className="flex-shrink-0 flex flex-col items-end gap-1"
+            >
+              <div className="flex items-center gap-1.5">
+                <span className="inline-block w-2 h-2 rounded-full border-2 border-[var(--color-accent)] border-t-transparent animate-spin flex-shrink-0" />
+                <p className="text-sm text-[var(--color-text-3)] whitespace-nowrap">
+                  Calculating activity…
+                </p>
+              </div>
+              {activityProgress !== null && activityProgress > 0 && (
+                <div className="flex items-center gap-0.5">
+                  <div className="w-30 h-0.5 rounded-full bg-[var(--color-surface-raised)] overflow-hidden">
+                    <motion.div
+                      className="h-full rounded-full bg-[var(--color-accent)]"
+                      animate={{ width: `${activityProgress}%` }}
+                      transition={{ duration: 0.4, ease: "easeOut" }}
+                    />
+                  </div>
+                  <span className="inline-block w-8 text-right text-xs text-[var(--color-text-3)] tabular-nums whitespace-nowrap">
+                    {etaMs !== null ? formatEta(etaMs) : "…"}
+                  </span>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Core stats */}
       <StaggeredStatGrid StatDisplays={CoreStatDisplays}></StaggeredStatGrid>
 
-
       {/* Activity stats */}
-      {activity && (<StaggeredStatGrid StatDisplays={ActivityStatDisplays}/>)}
+      {activity && <StaggeredStatGrid StatDisplays={ActivityStatDisplays} />}
 
       {/* Achievements */}
       {achievements.length > 0 && (
         <div className="border-t border-[var(--color-border)] px-4 py-3 sm:px-5">
           <div className="flex items-center justify-between mb-2.5">
             <div>
-              <p className="text-xs font-semibold text-[var(--color-text-1)]">
-                Achievements
-              </p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-xs font-semibold text-[var(--color-text-1)]">
+                  Achievements
+                </p>
+                <AnimatePresence>
+                  {achsAnimating && (
+                    <motion.span
+                      key="ach-spinner"
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      transition={{ duration: 0.2 }}
+                      className="inline-block w-3 h-3 rounded-full border-2 border-[var(--color-accent)] border-t-transparent animate-spin"
+                    />
+                  )}
+                </AnimatePresence>
+              </div>
               {summary && (
                 <p className="text-[10px] text-[var(--color-text-3)] mt-0.5">
                   {summary.total.unlocked} of {summary.total.total} unlocked
@@ -232,7 +339,9 @@ const SelfDisplay: FC = () => {
 
             {summary && (
               <div className="hidden sm:flex items-center gap-1.5">
-                {(["gold", "silver", "bronze", "secret"] as AchievementTier[]).map((tier) => {
+                {(
+                  ["gold", "silver", "bronze", "secret"] as AchievementTier[]
+                ).map((tier) => {
                   const t = summary[tier];
                   if (t.total === 0) return null;
                   const style = TIER_STYLES[tier];
@@ -241,7 +350,8 @@ const SelfDisplay: FC = () => {
                       key={tier}
                       className={`text-[10px] px-1.5 py-0.5 rounded border font-medium capitalize ${style.bg} ${style.text} ${style.border}`}
                     >
-                      {tier[0].toUpperCase()}{tier.slice(1)} {t.unlocked}/{t.total}
+                      {tier[0].toUpperCase()}
+                      {tier.slice(1)} {t.unlocked}/{t.total}
                     </span>
                   );
                 })}

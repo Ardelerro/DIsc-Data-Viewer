@@ -63,7 +63,10 @@ const SettingsModal = <T extends Record<string, boolean>>({
               </div>
 
               {Object.entries(showElements).map(([key, value]) => (
-                <div key={key} className="flex justify-between items-center py-1.5">
+                <div
+                  key={key}
+                  className="flex justify-between items-center py-1.5"
+                >
                   <span className="text-xs text-[var(--color-text-2)] capitalize">
                     {key.replace(/([A-Z])/g, " $1")}
                   </span>
@@ -81,7 +84,7 @@ const SettingsModal = <T extends Record<string, boolean>>({
         </motion.div>
       )}
     </AnimatePresence>,
-    document.body
+    document.body,
   );
 };
 

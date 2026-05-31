@@ -8,7 +8,10 @@ import type { UserStats } from "../../../types/discord";
 import Avatar from "../../Avatar";
 import { countInRange, type DateRange } from "../../../utils/timeFilterUtils";
 
-const TopUsers: FC<{ className?: string; dateRange?: DateRange | null }> = ({ className = "", dateRange = null }) => {
+const TopUsers: FC<{ className?: string; dateRange?: DateRange | null }> = ({
+  className = "",
+  dateRange = null,
+}) => {
   const { data } = useData();
 
   const userStats = useMemo<UserStats[]>(() => {
@@ -49,7 +52,11 @@ const TopUsers: FC<{ className?: string; dateRange?: DateRange | null }> = ({ cl
             className="w-6 h-6 rounded-full shrink-0"
           />
           <div className="min-w-0 flex-1 overflow-hidden">
-            <MarqueeText text={u.name} rotation="hover" className="text-sm text-[var(--color-text-1)]" />
+            <MarqueeText
+              text={u.name}
+              rotation="hover"
+              className="text-sm text-[var(--color-text-1)]"
+            />
           </div>
         </div>
       </td>

@@ -7,7 +7,10 @@ import MarqueeText from "../../text/MarqueeText";
 import type { ChannelInfo } from "../../../types/discord";
 import { countInRange, type DateRange } from "../../../utils/timeFilterUtils";
 
-const TopChannels: FC<{ className?: string; dateRange?: DateRange | null }> = ({ className = "", dateRange = null }) => {
+const TopChannels: FC<{ className?: string; dateRange?: DateRange | null }> = ({
+  className = "",
+  dateRange = null,
+}) => {
   const { data } = useData();
 
   const topChannels = useMemo<ChannelInfo[]>(() => {
@@ -20,10 +23,19 @@ const TopChannels: FC<{ className?: string; dateRange?: DateRange | null }> = ({
       const serverId = data.serverMapping.channelToServer[channelId];
       const serverName = data.serverMapping.serverNames[serverId] || "";
       const resolvedName =
-        data.channelNaming?.[channelId] || stats.recipientName || `#${channelId}`;
-      results.push({ channelId, name: resolvedName, totalMessages: total, serverName });
+        data.channelNaming?.[channelId] ||
+        stats.recipientName ||
+        `#${channelId}`;
+      results.push({
+        channelId,
+        name: resolvedName,
+        totalMessages: total,
+        serverName,
+      });
     }
-    return results.sort((a, b) => b.totalMessages - a.totalMessages).slice(0, 10);
+    return results
+      .sort((a, b) => b.totalMessages - a.totalMessages)
+      .slice(0, 10);
   }, [data, dateRange]);
 
   const rows = topChannels.map((c, i) => (
@@ -35,10 +47,18 @@ const TopChannels: FC<{ className?: string; dateRange?: DateRange | null }> = ({
         {i + 1}
       </td>
       <td className="px-3 py-2.5 overflow-hidden min-w-0">
-        <MarqueeText text={c.name} rotation="hover" className="text-sm text-[var(--color-text-1)]" />
+        <MarqueeText
+          text={c.name}
+          rotation="hover"
+          className="text-sm text-[var(--color-text-1)]"
+        />
       </td>
       <td className="px-3 py-2.5 overflow-hidden min-w-0">
-        <MarqueeText text={c.serverName} rotation="hover" className="text-xs text-[var(--color-text-3)]" />
+        <MarqueeText
+          text={c.serverName}
+          rotation="hover"
+          className="text-xs text-[var(--color-text-3)]"
+        />
       </td>
       <td className="px-3 py-2.5 text-xs text-[var(--color-accent)] font-mono tabular-nums text-right whitespace-nowrap">
         {c.totalMessages.toLocaleString()}
