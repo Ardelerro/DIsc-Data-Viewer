@@ -14,8 +14,9 @@ import type {
   MessageWorkerResponse,
 } from "../types/discord";
 import { getTopWords } from "../utils/textUtils";
+import { Profiler } from "./profiler";
+import { enrichUserMapping } from "./discordUser";
 import MessageWorker from "./messages.worker.ts?worker";
-
 
 configure({ useWebWorkers: true });
 
@@ -33,9 +34,12 @@ async function processZipData(
   file: File | Blob,
   onProgress?: (progress: number) => void,
   signal?: AbortSignal,
+  aiMode = false,
+  prof: Profiler = new Profiler(),
 ): Promise<Omit<ProcessedData, "activityStats">> {
+  const zp = new Profiler();
   const reader = new ZipReader(new BlobReader(file));
-  const entries = await reader.getEntries();
+  const entries = await zp.timeAsync("getEntries", () => reader.getEntries());
 
   const channelEntries: FileEntry[] = [];
   const messageEntries: FileEntry[] = [];
@@ -56,21 +60,25 @@ async function processZipData(
     }
   }
 
-  if (!userEntry) {
+  if (
+    !userEntry ||
+    (channelEntries.length === 0 && messageEntries.length === 0)
+  ) {
     await reader.close();
-    throw new Error("Account/user.json not found");
+    throw new Error("Invalid package structure");
   }
 
-  const [self, userMapping] = await extractAccountData(userEntry, usersEntry);
+  const [self, userMapping] = await zp.timeAsync("extractAccountData", () =>
+    extractAccountData(userEntry!, usersEntry),
+  );
 
-  // Single pass over every channel.json: build channel mapping + server mapping
-  // + recipient lookup data, all in parallel via zip.js's decompression workers.
   const channelMapping: Record<string, string> = {};
   const channelNaming: Record<string, string> = {};
   const channelRecipients: Record<string, string[]> = {};
   const channelToServer: Record<string, string> = {};
   const serverNames: Record<string, string> = {};
 
+  const stopChannelPass = zp.start("channelJsonPass");
   await Promise.all(
     channelEntries.map(async (entry) => {
       try {
@@ -91,7 +99,7 @@ async function processZipData(
 
         channelMapping[data.id] = type;
         if (data.name) channelNaming[data.id] = data.name;
-        // Keep only recipients for the later naming pass — not the whole object.
+
         if (Array.isArray(data.recipients)) {
           channelRecipients[data.id] = data.recipients;
         }
@@ -111,8 +119,22 @@ async function processZipData(
       }
     }),
   );
+  stopChannelPass();
 
-  // We're done with the main reader; workers each open their own.
+  const recipientIds: string[] = [];
+  for (const recips of Object.values(channelRecipients)) {
+    for (const r of recips) if (r !== self.id) recipientIds.push(r);
+  }
+  const enrichPromise = enrichUserMapping(
+    self,
+    userMapping,
+    recipientIds,
+    signal,
+  ).catch((err: unknown) => {
+    if (err instanceof DOMException && err.name === "AbortError") return err;
+    return null;
+  });
+
   await reader.close();
   if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
   onProgress?.(3);
@@ -121,6 +143,7 @@ async function processZipData(
     hourly: {},
     monthly: {},
     daily: {},
+    dailyHourly: {},
     topWords: [],
     totalGapTime: 0,
     numGaps: 0,
@@ -140,9 +163,6 @@ async function processZipData(
   const totalFiles = messageFilenames.length;
 
   if (totalFiles > 0) {
-    // Largest files first: a mega-channel starts immediately and work-stealing
-    // fills the tail with small files, keeping every worker busy. Progress is
-    // weighted by uncompressed bytes so the bar never stalls on one big file.
     const sizeByName = new Map<string, number>();
     for (const e of messageEntries) {
       sizeByName.set(e.filename, e.uncompressedSize || 0);
@@ -159,16 +179,17 @@ async function processZipData(
     let lastReported = -1;
     const reportProgress = () => {
       const pct = (processedBytes / totalBytes) * 100;
-      // Throttle: only update on integer percent changes.
+
       const intPct = pct | 0;
       if (intPct === lastReported) return;
       lastReported = intPct;
-      // Reserve 3% for initial channel pass + 2% tail for finalization.
+
       onProgress?.(3 + pct * 0.95);
     };
 
     const workerCount = Math.min(MAX_WORKERS, totalFiles);
 
+    const stopPool = zp.start("workerPool:wall");
     await Promise.all(
       Array.from(
         { length: workerCount },
@@ -195,7 +216,6 @@ async function processZipData(
               const m = ev.data;
               if (!m || done) return;
               if (m.type === "idle") {
-                // Hand out the next file, or tell the worker to wrap up.
                 if (qi < queue.length) {
                   worker.postMessage({ type: "file", filename: queue[qi++] });
                 } else {
@@ -215,11 +235,11 @@ async function processZipData(
                   const type = channelMapping[channelId];
                   if (!type) continue;
                   const key =
-                    type === "DM"
-                      ? `dm_${channelId}`
-                      : `channel_${channelId}`;
+                    type === "DM" ? `dm_${channelId}` : `channel_${channelId}`;
                   channelStats[key] = stats;
                 }
+
+                zp.merge(m.profile, "msgworker/");
                 done = true;
                 signal?.removeEventListener("abort", onAbort);
                 worker.terminate();
@@ -234,14 +254,21 @@ async function processZipData(
               worker.terminate();
               reject(err);
             };
-            worker.postMessage({ type: "init", file, channelMapping });
+            worker.postMessage({ type: "init", file, channelMapping, aiMode });
           }),
       ),
     );
+    stopPool();
   }
 
-  // Recipient naming pass — main thread, deterministic ordering by entry order so
-  // "Deleted User1", "Deleted User2", etc. are stable across runs of the same export.
+  const enrichErr = await zp.timeAsync(
+    "enrichUsers:await",
+    () => enrichPromise,
+  );
+  if (enrichErr) throw enrichErr;
+
+  const stopFinalize = zp.start("finalize(naming+topWords)");
+
   const dmManifest: string[] = [];
   const channelManifest: string[] = [];
   const deletedUserCount = { n: 0 };
@@ -277,8 +304,6 @@ async function processZipData(
     }
   }
 
-  // Drop globally-rare (count-1) words before the final top-N sort — a word
-  // seen once across the whole export is never a top word.
   if (Object.keys(globalWordFreq).length > 5000) {
     for (const k in globalWordFreq) {
       if (globalWordFreq[k] <= 1) delete globalWordFreq[k];
@@ -296,6 +321,8 @@ async function processZipData(
     aggregateStats.hourlySentimentAverage[hour] = an > 0 ? total / an : 0;
   }
 
+  stopFinalize();
+  prof.merge(zp.export(), "zip/");
   onProgress?.(100);
 
   return {
@@ -326,6 +353,16 @@ function mergeAggregate(
   if (target.daily) {
     for (const k in src.daily) {
       target.daily[k] = (target.daily[k] || 0) + src.daily[k];
+    }
+  }
+  if (target.dailyHourly) {
+    for (const date in src.dailyHourly) {
+      const srcRow = src.dailyHourly[date];
+      const tgtRow =
+        target.dailyHourly[date] || (target.dailyHourly[date] = {});
+      for (const h in srcRow) {
+        tgtRow[h] = (tgtRow[h] || 0) + srcRow[h];
+      }
     }
   }
   for (const k in src.hourlySentimentTotal) {

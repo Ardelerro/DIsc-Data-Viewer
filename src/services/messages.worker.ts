@@ -7,13 +7,14 @@ import {
 } from "@zip.js/zip.js";
 import { calculateStreak } from "../utils/streakUtils";
 import { getTopWords, STOP_WORDS } from "../utils/textUtils";
-import { analyzeText } from "../utils/sentimentAnalyzer";
+import { analyzeText, tokenizeWords } from "../utils/sentimentAnalyzer";
 import {
   classifyCompound,
   compoundToScore,
   lengthWeight,
 } from "../utils/sentimentScale";
-import { createObjectStreamParser, parseTimestamp } from "./messageStream";
+import { createStreamParser, parseTimestamp } from "./messageStream";
+import { Profiler } from "./profiler";
 import type {
   PartialAgg,
   ChannelStats,
@@ -25,30 +26,27 @@ configure({ useWebWorkers: false });
 
 const MESSAGE_GAP_THRESHOLD_S = 30 * 60;
 
-// messages.json files at or above this uncompressed size are read with the
-// streaming structural scanner; smaller ones use one-shot JSON.parse (faster
-// for the common case). Streaming sidesteps V8's ~512MB string cap and keeps
-// memory bounded to one message object at a time.
-const STREAM_THRESHOLD_BYTES = 96 * 1024 * 1024;
+const STREAM_THRESHOLD_BYTES = 24 * 1024 * 1024;
 
-// Distinct-key ceiling for the worker's global word map before hapax (count-1)
-// pruning runs — bounds memory on huge, highly varied vocabularies.
+const PROGRESS_BATCH_BYTES = 2 * 1024 * 1024;
+
 const WORD_CAP = 200_000;
 
 const post = (msg: MessageWorkerResponse) =>
   (postMessage as (m: MessageWorkerResponse) => void)(msg);
 
-// --- worker-global state (this worker handles many files over its lifetime) ---
-
 let reader: ZipReader<Blob> | null = null;
 const entryByName = new Map<string, FileEntry>();
 let channelMapping: Record<string, string> = {};
+let aiMode = false;
 let approxGlobalKeys = 0;
+const prof = new Profiler();
 
 const agg: PartialAgg = {
   hourly: {},
   monthly: {},
   daily: {},
+  dailyHourly: {},
   hourlySentimentTotal: {},
   hourlyAnalyzedCount: {},
   globalWordFreq: {},
@@ -64,8 +62,11 @@ self.onmessage = async (ev: MessageEvent<MessageWorkerRequest>) => {
 
   if (req.type === "init") {
     channelMapping = req.channelMapping;
+    aiMode = req.aiMode;
     reader = new ZipReader(new BlobReader(req.file));
-    const entries = await reader.getEntries();
+    const entries = await prof.timeAsync("init:getEntries", () =>
+      reader!.getEntries(),
+    );
     for (const e of entries) {
       if (!e.directory) entryByName.set(e.filename, e as FileEntry);
     }
@@ -81,12 +82,10 @@ self.onmessage = async (ev: MessageEvent<MessageWorkerRequest>) => {
         /* reader already closed / nothing to flush */
       }
     }
-    post({ type: "result", agg, channels });
+    post({ type: "result", agg, channels, profile: prof.export() });
     self.close();
   }
 };
-
-// --- per-channel accumulators ---------------------------------------------
 
 interface ChannelAcc {
   hourly: Record<string, number>;
@@ -102,9 +101,11 @@ interface ChannelAcc {
   sentAvgSum: number;
   sentWeightSum: number;
   messageCount: number;
-  tsList: number[];
+
+  tsSec: Int32Array;
+  tsLen: number;
   minTs: number;
-  lastTs: number;
+  lastSec: number;
   alreadySorted: boolean;
 }
 
@@ -123,9 +124,10 @@ function createAcc(): ChannelAcc {
     sentAvgSum: 0,
     sentWeightSum: 0,
     messageCount: 0,
-    tsList: [],
+    tsSec: new Int32Array(64),
+    tsLen: 0,
     minTs: Infinity,
-    lastTs: -Infinity,
+    lastSec: -Infinity,
     alreadySorted: true,
   };
 }
@@ -134,10 +136,18 @@ async function processFile(filename: string) {
   const entry = entryByName.get(filename);
   const size = entry?.uncompressedSize ?? 0;
   let reported = 0;
+  let pending = 0;
+  const flush = () => {
+    if (pending > 0) {
+      post({ type: "progress", bytes: pending });
+      pending = 0;
+    }
+  };
   const reportDelta = (bytes: number) => {
     if (bytes <= 0) return;
     reported += bytes;
-    post({ type: "progress", bytes });
+    pending += bytes;
+    if (pending >= PROGRESS_BATCH_BYTES) flush();
   };
 
   try {
@@ -155,7 +165,10 @@ async function processFile(filename: string) {
     }
 
     if (acc.messageCount > 0) {
-      channels.push({ channelId, stats: finalizeChannel(acc) });
+      const stop = prof.start("finalizeChannel");
+      const stats = finalizeChannel(acc);
+      stop();
+      channels.push({ channelId, stats });
     }
 
     if (approxGlobalKeys > WORD_CAP) {
@@ -166,23 +179,28 @@ async function processFile(filename: string) {
     console.warn(`Failed to process ${filename}`, err);
   } finally {
     if (size > reported) reportDelta(size - reported);
+    flush();
   }
 }
 
 async function parseWhole(entry: FileEntry, acc: ChannelAcc) {
   let messages: unknown;
   try {
-    const text = await entry.getData(new TextWriter());
-    messages = JSON.parse(text);
+    const text = await prof.timeAsync("whole:getData(decompress)", () =>
+      entry.getData(new TextWriter()),
+    );
+    messages = prof.time("whole:JSON.parse", () => JSON.parse(text));
   } catch (err) {
     console.warn("Failed to read/parse messages.json", err);
     return;
   }
   if (!Array.isArray(messages)) return;
+  const stop = prof.start("whole:fold(analyze)");
   for (let i = 0; i < messages.length; i++) {
     const r = messages[i] as { Timestamp?: unknown; Contents?: unknown };
     if (r && r.Timestamp) foldMessage(r.Contents, String(r.Timestamp), acc);
   }
+  stop();
 }
 
 async function streamFile(
@@ -190,37 +208,27 @@ async function streamFile(
   acc: ChannelAcc,
   reportDelta: (bytes: number) => void,
 ) {
-  const decoder = new TextDecoder("utf-8", { fatal: false });
-
-  const parser = createObjectStreamParser((objText) => {
-    try {
-      const obj = JSON.parse(objText) as {
-        Timestamp?: unknown;
-        Contents?: unknown;
-      };
-      if (obj && obj.Timestamp) {
-        foldMessage(obj.Contents, String(obj.Timestamp), acc);
-      }
-    } catch {
-      /* skip a malformed object rather than failing the whole file */
+  const parser = createStreamParser((obj) => {
+    if (obj.Timestamp) {
+      foldMessage(obj.Contents, String(obj.Timestamp), acc);
     }
   });
 
+  let feedMs = 0;
   const writable = new WritableStream<Uint8Array>({
     write(chunk) {
-      parser.feed(decoder.decode(chunk, { stream: true }));
+      const t0 = performance.now();
+      parser.feed(chunk);
+      feedMs += performance.now() - t0;
       reportDelta(chunk.byteLength);
-    },
-    close() {
-      const tail = decoder.decode();
-      if (tail) parser.feed(tail);
     },
   });
 
+  const stop = prof.start("stream:getData(decompress+parse+fold)");
   await entry.getData(writable);
+  stop();
+  prof.record("stream:parse+fold", feedMs);
 }
-
-// --- per-message fold ------------------------------------------------------
 
 function foldMessage(contents: unknown, timestampStr: string, acc: ChannelAcc) {
   const parsed = parseTimestamp(timestampStr);
@@ -230,68 +238,60 @@ function foldMessage(contents: unknown, timestampStr: string, acc: ChannelAcc) {
   acc.hourly[hour] = (acc.hourly[hour] || 0) + 1;
   acc.monthly[month] = (acc.monthly[month] || 0) + 1;
   acc.daily[date] = (acc.daily[date] || 0) + 1;
-  agg.hourly[hour] = (agg.hourly[hour] || 0) + 1;
-  agg.monthly[month] = (agg.monthly[month] || 0) + 1;
-  agg.daily[date] = (agg.daily[date] || 0) + 1;
   acc.messageCount++;
-  agg.messageCount++;
+  const dhRow = agg.dailyHourly[date] || (agg.dailyHourly[date] = {});
+  dhRow[hour] = (dhRow[hour] || 0) + 1;
 
-  acc.tsList.push(ts);
-  if (ts < acc.lastTs) acc.alreadySorted = false;
-  acc.lastTs = ts;
+  const sec = (ts / 1000) | 0;
+  if (acc.tsLen === acc.tsSec.length) {
+    const grown = new Int32Array(acc.tsSec.length * 2);
+    grown.set(acc.tsSec);
+    acc.tsSec = grown;
+  }
+  acc.tsSec[acc.tsLen++] = sec;
+  if (sec < acc.lastSec) acc.alreadySorted = false;
+  acc.lastSec = sec;
   if (ts < acc.minTs) acc.minTs = ts;
   acc.messageDates.add(date);
 
   if (typeof contents === "string" && contents.length > 0) {
-    const result = analyzeText(contents);
-    const compound = result.compound;
-    const cls = classifyCompound(compound);
-    if (cls === "positive") acc.sentPos++;
-    else if (cls === "negative") acc.sentNeg++;
-    else acc.sentNeu++;
-    // score: compound [-1,+1] → [-100,+100]. weight: longer messages count
-    // somewhat more, sub-linearly (see lengthWeight). Hourly totals carry the
-    // same weighting so every average stays a length-weighted mean.
-    const score = compoundToScore(compound);
-    const weight = lengthWeight(result.words.length);
-    const weighted = score * weight;
-    acc.sentAvgSum += weighted;
-    acc.sentWeightSum += weight;
-    agg.hourlySentimentTotal[hour] =
-      (agg.hourlySentimentTotal[hour] || 0) + weighted;
-    acc.localHourlySentiment[hour] =
-      (acc.localHourlySentiment[hour] || 0) + weighted;
-    acc.localHourlyAnalyzed[hour] =
-      (acc.localHourlyAnalyzed[hour] || 0) + weight;
-    agg.hourlyAnalyzedCount[hour] =
-      (agg.hourlyAnalyzedCount[hour] || 0) + weight;
+    let words: string[];
+    if (aiMode) {
+      words = tokenizeWords(contents);
+    } else {
+      const result = analyzeText(contents);
+      words = result.words;
+      const compound = result.compound;
+      const cls = classifyCompound(compound);
+      if (cls === "positive") acc.sentPos++;
+      else if (cls === "negative") acc.sentNeg++;
+      else acc.sentNeu++;
 
-    // result.words are lowercased content words with code blocks / URLs /
-    // mentions already stripped — reused here instead of re-tokenizing.
-    const words = result.words;
+      const score = compoundToScore(compound);
+      const weight = lengthWeight(words.length);
+      const weighted = score * weight;
+      acc.sentAvgSum += weighted;
+      acc.sentWeightSum += weight;
+      acc.localHourlySentiment[hour] =
+        (acc.localHourlySentiment[hour] || 0) + weighted;
+      acc.localHourlyAnalyzed[hour] =
+        (acc.localHourlyAnalyzed[hour] || 0) + weight;
+    }
+
     for (let w = 0; w < words.length; w++) {
       const word = words[w];
       if (!STOP_WORDS.has(word)) {
         acc.localWordFreq[word] = (acc.localWordFreq[word] || 0) + 1;
-        const cur = agg.globalWordFreq[word];
-        if (cur === undefined) {
-          agg.globalWordFreq[word] = 1;
-          approxGlobalKeys++;
-        } else {
-          agg.globalWordFreq[word] = cur + 1;
-        }
       }
     }
   }
 }
 
-// --- finalization ----------------------------------------------------------
-
 function finalizeChannel(acc: ChannelAcc): ChannelStats {
-  // Gap / conversation timing needs chronological order; sort the buffered
-  // numeric timestamps only when the stream wasn't already ordered.
-  const ts = acc.tsList;
-  if (!acc.alreadySorted) ts.sort((a, b) => a - b);
+  const n = acc.tsLen;
+  const tsSec = acc.tsSec;
+
+  if (!acc.alreadySorted) tsSec.subarray(0, n).sort();
 
   let totalGapTime = 0;
   let numGaps = 0;
@@ -300,8 +300,8 @@ function finalizeChannel(acc: ChannelAcc): ChannelStats {
   let startSec = -1;
   let prevSec = -1;
 
-  for (let i = 0; i < ts.length; i++) {
-    const sec = (ts[i] / 1000) | 0;
+  for (let i = 0; i < n; i++) {
+    const sec = tsSec[i];
     if (startSec < 0) {
       startSec = sec;
     } else if (prevSec >= 0) {
@@ -327,6 +327,28 @@ function finalizeChannel(acc: ChannelAcc): ChannelStats {
   agg.totalGapTime += totalGapTime;
   agg.numGaps += numGaps;
 
+  agg.messageCount += acc.messageCount;
+  for (const h in acc.hourly)
+    agg.hourly[h] = (agg.hourly[h] || 0) + acc.hourly[h];
+  for (const m in acc.monthly)
+    agg.monthly[m] = (agg.monthly[m] || 0) + acc.monthly[m];
+  for (const d in acc.daily) agg.daily[d] = (agg.daily[d] || 0) + acc.daily[d];
+  for (const h in acc.localHourlySentiment)
+    agg.hourlySentimentTotal[h] =
+      (agg.hourlySentimentTotal[h] || 0) + acc.localHourlySentiment[h];
+  for (const h in acc.localHourlyAnalyzed)
+    agg.hourlyAnalyzedCount[h] =
+      (agg.hourlyAnalyzedCount[h] || 0) + acc.localHourlyAnalyzed[h];
+  for (const word in acc.localWordFreq) {
+    const cur = agg.globalWordFreq[word];
+    if (cur === undefined) {
+      agg.globalWordFreq[word] = acc.localWordFreq[word];
+      approxGlobalKeys++;
+    } else {
+      agg.globalWordFreq[word] = cur + acc.localWordFreq[word];
+    }
+  }
+
   const hourlySentimentAverage: Record<string, number> = {};
   for (const hour in acc.hourly) {
     const an = acc.localHourlyAnalyzed[hour] || 0;
@@ -341,8 +363,7 @@ function finalizeChannel(acc: ChannelAcc): ChannelStats {
     monthly: acc.monthly,
     daily: acc.daily,
     sentiment: {
-      average:
-        acc.sentWeightSum > 0 ? acc.sentAvgSum / acc.sentWeightSum : 0,
+      average: acc.sentWeightSum > 0 ? acc.sentAvgSum / acc.sentWeightSum : 0,
       positive: acc.sentPos,
       negative: acc.sentNeg,
       neutral: acc.sentNeu,
