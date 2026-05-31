@@ -70,7 +70,10 @@ const HourlyChart: FC<HourlyChartProps> = ({ data, className = "", title }) => {
               <Tooltip
                 cursor={{ fill: C.surfaceRaised }}
                 contentStyle={CHART_TOOLTIP_STYLE}
-                formatter={(value: number) => [value.toLocaleString(), "Messages"]}
+                formatter={(value: number) => [
+                  value.toLocaleString(),
+                  "Messages",
+                ]}
                 labelFormatter={(label) => `${label}:00`}
               />
               <Bar

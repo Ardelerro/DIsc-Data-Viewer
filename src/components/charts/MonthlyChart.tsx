@@ -19,7 +19,9 @@ const MonthlyChart: FC<MonthlyChartProps> = ({ data, className = "" }) => {
     if (months.length === 0) return [];
 
     const [startYear, startMonth] = months[0].split("-").map(Number);
-    const [endYear, endMonth] = months[months.length - 1].split("-").map(Number);
+    const [endYear, endMonth] = months[months.length - 1]
+      .split("-")
+      .map(Number);
 
     const result: { month: string; count: number }[] = [];
     let year = startYear;
@@ -29,7 +31,10 @@ const MonthlyChart: FC<MonthlyChartProps> = ({ data, className = "" }) => {
       const monthStr = `${year}-${String(month).padStart(2, "0")}`;
       result.push({ month: monthStr, count: data[monthStr] ?? 0 });
       month++;
-      if (month > 12) { month = 1; year++; }
+      if (month > 12) {
+        month = 1;
+        year++;
+      }
     }
 
     return result;
@@ -84,7 +89,10 @@ const MonthlyChart: FC<MonthlyChartProps> = ({ data, className = "" }) => {
                 <Tooltip
                   cursor={{ stroke: C.border, strokeWidth: 1 }}
                   contentStyle={CHART_TOOLTIP_STYLE}
-                  formatter={(val: number) => [val.toLocaleString(), "Messages"]}
+                  formatter={(val: number) => [
+                    val.toLocaleString(),
+                    "Messages",
+                  ]}
                   labelFormatter={(label) => label}
                 />
                 <Line
