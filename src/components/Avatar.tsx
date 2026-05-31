@@ -9,7 +9,7 @@ interface AvatarProps {
 }
 
 const getDefaultAvatar = (userId?: string) =>
-  `https://cdn.discordapp.com/embed/avatars/${userId ? Number(userId) % 5 : 0}.png`;
+  `/discord-cdn/embed/avatars/${userId ? Number(userId) % 5 : 0}.png`;
 
 const Avatar: FC<AvatarProps> = ({
   userId,
@@ -20,7 +20,7 @@ const Avatar: FC<AvatarProps> = ({
 }) => {
   const src =
     userId && avatarHash
-      ? `https://cdn.discordapp.com/avatars/${userId}/${avatarHash}.png?size=${size}`
+      ? `/discord-cdn/avatars/${userId}/${avatarHash}.png?size=${size}`
       : getDefaultAvatar(userId);
 
   return (
