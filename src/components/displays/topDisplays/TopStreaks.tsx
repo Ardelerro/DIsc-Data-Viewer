@@ -9,7 +9,10 @@ import Avatar from "../../Avatar";
 import type { DateRange } from "../../../utils/timeFilterUtils";
 import { calculateStreak } from "../../../utils/streakUtils";
 
-const TopStreaks: FC<{ className?: string; dateRange?: DateRange | null }> = ({ className = "", dateRange = null }) => {
+const TopStreaks: FC<{ className?: string; dateRange?: DateRange | null }> = ({
+  className = "",
+  dateRange = null,
+}) => {
   const { data } = useData();
 
   const streakStats = useMemo<StreakStats[]>(() => {
@@ -24,7 +27,9 @@ const TopStreaks: FC<{ className?: string; dateRange?: DateRange | null }> = ({ 
 
       if (dateRange && stats.daily) {
         const filteredDates = new Set(
-          Object.keys(stats.daily).filter(d => d >= dateRange.start && d <= dateRange.end)
+          Object.keys(stats.daily).filter(
+            (d) => d >= dateRange.start && d <= dateRange.end,
+          ),
         );
         const streak = calculateStreak(filteredDates);
         longestStreak = streak.length;
@@ -43,7 +48,9 @@ const TopStreaks: FC<{ className?: string; dateRange?: DateRange | null }> = ({ 
         ([, info]) => info.username === stats.recipientName,
       );
       const userId = userEntry?.[0];
-      const avatar = userId ? data.userMapping?.[userId]?.avatar || undefined : undefined;
+      const avatar = userId
+        ? data.userMapping?.[userId]?.avatar || undefined
+        : undefined;
       results.push({
         channelId,
         userId,
@@ -80,7 +87,11 @@ const TopStreaks: FC<{ className?: string; dateRange?: DateRange | null }> = ({ 
             className="w-6 h-6 rounded-full shrink-0"
           />
           <div className="min-w-0 flex-1 overflow-hidden">
-            <MarqueeText text={s.name} rotation="hover" className="text-sm text-[var(--color-text-1)]" />
+            <MarqueeText
+              text={s.name}
+              rotation="hover"
+              className="text-sm text-[var(--color-text-1)]"
+            />
           </div>
         </div>
       </td>

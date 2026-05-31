@@ -2,7 +2,10 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
 import { X, Download, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
-import { previewAllCards, downloadWrappedCard } from "../../utils/generateWrapped";
+import {
+  previewAllCards,
+  downloadWrappedCard,
+} from "../../utils/generateWrapped";
 import type { WrappedCardData } from "../../types/discord";
 
 interface Props {
@@ -30,9 +33,8 @@ export default function WrappedCarousel({ data, onClose }: Props) {
   const touchStartX = useRef<number | null>(null);
   const isMobile = window.innerWidth < 768;
 
-  
   const cardW = isMobile
-    ? window.innerWidth - 32 
+    ? window.innerWidth - 32
     : Math.min(CARD_DISPLAY_W, Math.round(window.innerWidth * 0.72));
   const cardH = Math.round(cardW * ASPECT);
 
@@ -47,7 +49,9 @@ export default function WrappedCarousel({ data, onClose }: Props) {
         setProgress(100);
       }
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [data]);
 
   useEffect(() => {
@@ -114,7 +118,7 @@ export default function WrappedCarousel({ data, onClose }: Props) {
       style={{
         background: "rgba(0,0,0,0.96)",
         backdropFilter: "blur(24px)",
-        
+
         justifyContent: isMobile ? "flex-start" : "center",
         paddingTop: isMobile ? 0 : undefined,
       }}
@@ -122,7 +126,6 @@ export default function WrappedCarousel({ data, onClose }: Props) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      
       <button
         onClick={onClose}
         className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 transition text-white z-20"
@@ -131,50 +134,71 @@ export default function WrappedCarousel({ data, onClose }: Props) {
         <X className="w-5 h-5" />
       </button>
 
-      
       <div
         className="w-full text-center z-10 flex-shrink-0"
-        style={{ paddingTop: isMobile ? 20 : undefined, marginBottom: isMobile ? 14 : undefined }}
+        style={{
+          paddingTop: isMobile ? 20 : undefined,
+          marginBottom: isMobile ? 14 : undefined,
+        }}
       >
         <p className="text-[10px] uppercase tracking-[0.22em] text-white/35 mb-0.5">
           Discord Wrapped
         </p>
-        <h2 className="text-white font-bold text-[17px]">{data.self.username}</h2>
+        <h2 className="text-white font-bold text-[17px]">
+          {data.self.username}
+        </h2>
       </div>
 
       {loading ? (
         /* ── Loading state ── */
         <div className="flex flex-col items-center gap-5 text-white/60 px-8 w-full max-w-[280px] mt-16">
           <div className="relative w-14 h-14 flex items-center justify-center">
-            <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 56 56">
-              <circle cx="28" cy="28" r="24" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="3" />
+            <svg
+              className="absolute inset-0 w-full h-full -rotate-90"
+              viewBox="0 0 56 56"
+            >
               <circle
-                cx="28" cy="28" r="24" fill="none" stroke="#5865F2" strokeWidth="3"
+                cx="28"
+                cy="28"
+                r="24"
+                fill="none"
+                stroke="rgba(255,255,255,0.1)"
+                strokeWidth="3"
+              />
+              <circle
+                cx="28"
+                cy="28"
+                r="24"
+                fill="none"
+                stroke="#5865F2"
+                strokeWidth="3"
                 strokeLinecap="round"
                 strokeDasharray={`${2 * Math.PI * 24}`}
                 strokeDashoffset={`${2 * Math.PI * 24 * (1 - loadProgress / 100)}`}
                 style={{ transition: "stroke-dashoffset 0.4s ease" }}
               />
             </svg>
-            <span className="text-xs font-bold text-white/70">{loadProgress}%</span>
+            <span className="text-xs font-bold text-white/70">
+              {loadProgress}%
+            </span>
           </div>
           <p className="text-sm text-center leading-relaxed">
-            Building your cards…<br />
-            <span className="text-xs opacity-50">Rendering at full quality</span>
+            Building your cards…
+            <br />
+            <span className="text-xs opacity-50">
+              Rendering at full quality
+            </span>
           </p>
         </div>
       ) : (
         <div
           className="flex flex-col items-center w-full flex-1"
           style={{
-            
             overflowY: isMobile ? "auto" : "visible",
             paddingBottom: isMobile ? 24 : 0,
           }}
         >
-          
           <div className="flex items-center gap-3 px-4">
-            
             {!isMobile && (
               <button
                 onClick={() => go(-1)}
@@ -184,7 +208,6 @@ export default function WrappedCarousel({ data, onClose }: Props) {
               </button>
             )}
 
-            
             <div
               className="relative flex-shrink-0"
               style={{
@@ -193,7 +216,9 @@ export default function WrappedCarousel({ data, onClose }: Props) {
                 borderRadius: 16,
                 overflow: "hidden",
               }}
-              onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; }}
+              onTouchStart={(e) => {
+                touchStartX.current = e.touches[0].clientX;
+              }}
               onTouchEnd={(e) => {
                 if (touchStartX.current === null) return;
                 const diff = touchStartX.current - e.changedTouches[0].clientX;
@@ -201,7 +226,6 @@ export default function WrappedCarousel({ data, onClose }: Props) {
                 touchStartX.current = null;
               }}
             >
-              
               <div
                 style={{
                   position: "absolute",
@@ -235,7 +259,12 @@ export default function WrappedCarousel({ data, onClose }: Props) {
                     <img
                       src={activeCard.dataUrl}
                       alt={activeCard.label}
-                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                        display: "block",
+                      }}
                       draggable={false}
                     />
                   )}
@@ -243,7 +272,6 @@ export default function WrappedCarousel({ data, onClose }: Props) {
               </AnimatePresence>
             </div>
 
-            
             {!isMobile && (
               <button
                 onClick={() => go(1)}
@@ -254,7 +282,6 @@ export default function WrappedCarousel({ data, onClose }: Props) {
             )}
           </div>
 
-          
           {isMobile && (
             <div className="flex items-center gap-4 mt-4 px-4">
               <button
@@ -265,17 +292,20 @@ export default function WrappedCarousel({ data, onClose }: Props) {
                 <ChevronLeft className="w-5 h-5" />
               </button>
 
-              
               <div className="flex items-center gap-1.5 flex-1 justify-center">
                 {cards.map((c, i) => (
                   <button
                     key={c.id}
-                    onClick={() => { setDirection(i > active ? 1 : -1); setActive(i); }}
+                    onClick={() => {
+                      setDirection(i > active ? 1 : -1);
+                      setActive(i);
+                    }}
                     style={{
                       width: i === active ? 18 : 5,
                       height: 5,
                       borderRadius: 3,
-                      background: i === active ? accentColor : "rgba(255,255,255,0.18)",
+                      background:
+                        i === active ? accentColor : "rgba(255,255,255,0.18)",
                       transition: "all 0.3s ease",
                       border: "none",
                       cursor: "pointer",
@@ -296,18 +326,21 @@ export default function WrappedCarousel({ data, onClose }: Props) {
             </div>
           )}
 
-          
           {!isMobile && (
             <div className="flex gap-2 mt-4">
               {cards.map((c, i) => (
                 <button
                   key={c.id}
-                  onClick={() => { setDirection(i > active ? 1 : -1); setActive(i); }}
+                  onClick={() => {
+                    setDirection(i > active ? 1 : -1);
+                    setActive(i);
+                  }}
                   style={{
                     width: i === active ? 20 : 5,
                     height: 5,
                     borderRadius: 3,
-                    background: i === active ? accentColor : "rgba(255,255,255,0.18)",
+                    background:
+                      i === active ? accentColor : "rgba(255,255,255,0.18)",
                     transition: "all 0.3s ease",
                     border: "none",
                     cursor: "pointer",
@@ -319,7 +352,6 @@ export default function WrappedCarousel({ data, onClose }: Props) {
             </div>
           )}
 
-          
           <div className="flex items-center gap-2.5 mt-3">
             <p className="text-[10px] uppercase tracking-[0.18em] text-white/40">
               {activeCard?.label}
@@ -329,7 +361,6 @@ export default function WrappedCarousel({ data, onClose }: Props) {
             </span>
           </div>
 
-          
           <div
             className="flex mt-3 mb-2"
             style={{
@@ -339,7 +370,6 @@ export default function WrappedCarousel({ data, onClose }: Props) {
               padding: isMobile ? "0 0" : undefined,
             }}
           >
-            
             <motion.button
               whileTap={{ scale: 0.97 }}
               onClick={() => handleDownload(activeCard?.id)}
@@ -357,16 +387,21 @@ export default function WrappedCarousel({ data, onClose }: Props) {
               }}
             >
               {downloading === activeCard?.id ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Rendering 4K…</>
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" /> Rendering 4K…
+                </>
               ) : (
-                <><Download className="w-4 h-4" /> Save 4K PNG</>
+                <>
+                  <Download className="w-4 h-4" /> Save 4K PNG
+                </>
               )}
             </motion.button>
 
-            
             <motion.button
               whileTap={{ scale: 0.97 }}
-              onClick={async () => { for (const c of cards) await handleDownload(c.id); }}
+              onClick={async () => {
+                for (const c of cards) await handleDownload(c.id);
+              }}
               disabled={!!downloading}
               className="flex items-center justify-center gap-2 rounded-full font-bold text-sm transition-opacity"
               style={{

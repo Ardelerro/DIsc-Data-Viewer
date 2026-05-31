@@ -7,7 +7,10 @@ import MarqueeText from "../../text/MarqueeText";
 import type { ServerStats } from "../../../types/discord";
 import { countInRange, type DateRange } from "../../../utils/timeFilterUtils";
 
-const TopServers: FC<{ className?: string; dateRange?: DateRange | null }> = ({ className = "", dateRange = null }) => {
+const TopServers: FC<{ className?: string; dateRange?: DateRange | null }> = ({
+  className = "",
+  dateRange = null,
+}) => {
   const { data, isLoading } = useData();
 
   const topServers = useMemo(() => {
@@ -19,18 +22,23 @@ const TopServers: FC<{ className?: string; dateRange?: DateRange | null }> = ({ 
       const channelId = key.replace(/^channel_/, "");
       const total = countInRange(stats, dateRange);
       const type = data.channelMapping[channelId];
-      if (!["GUILD_TEXT", "PUBLIC_THREAD", "GUILD_VOICE"].includes(type)) continue;
-      const serverId = serverMapping.channelToServer[channelId] ?? `unknown (${channelId})`;
+      if (!["GUILD_TEXT", "PUBLIC_THREAD", "GUILD_VOICE"].includes(type))
+        continue;
+      const serverId =
+        serverMapping.channelToServer[channelId] ?? `unknown (${channelId})`;
       serverCounts[serverId] = (serverCounts[serverId] || 0) + total;
     }
     const serverStats: ServerStats[] = Object.entries(serverCounts).map(
       ([serverId, totalMessages]) => ({
         serverId,
-        name: serverMapping.serverNames[serverId] ?? `Unknown Server (${serverId})`,
+        name:
+          serverMapping.serverNames[serverId] ?? `Unknown Server (${serverId})`,
         totalMessages,
-      })
+      }),
     );
-    return serverStats.sort((a, b) => b.totalMessages - a.totalMessages).slice(0, 10);
+    return serverStats
+      .sort((a, b) => b.totalMessages - a.totalMessages)
+      .slice(0, 10);
   }, [data, dateRange]);
 
   const rows = topServers.map((s, i) => (
@@ -42,7 +50,10 @@ const TopServers: FC<{ className?: string; dateRange?: DateRange | null }> = ({ 
         {i + 1}
       </td>
       <td className="px-3 py-2.5 overflow-hidden min-w-0">
-        <MarqueeText text={s.name} className="text-sm text-[var(--color-text-1)]" />
+        <MarqueeText
+          text={s.name}
+          className="text-sm text-[var(--color-text-1)]"
+        />
       </td>
       <td className="px-3 py-2.5 text-xs text-[var(--color-accent)] font-mono tabular-nums text-right whitespace-nowrap">
         {s.totalMessages.toLocaleString()}
