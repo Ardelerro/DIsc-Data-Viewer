@@ -3,8 +3,8 @@ import type { FC, PropsWithChildren } from "react";
 
 const pageVariants = {
   initial: { opacity: 0, scale: 0.98, filter: "blur(4px)" },
-  in:      { opacity: 1, scale: 1,    filter: "blur(0px)" },
-  out:     { opacity: 0, scale: 1.01, filter: "blur(4px)" },
+  in: { opacity: 1, scale: 1, filter: "blur(0px)" },
+  out: { opacity: 0, scale: 1.01, filter: "blur(4px)" },
 };
 
 const PageWrapper: FC<PropsWithChildren<{}>> = ({ children }) => (

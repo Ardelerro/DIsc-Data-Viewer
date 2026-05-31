@@ -6,20 +6,58 @@ import UploadPage from "../pages/UploadPage";
 import PageWrapper from "../utils/PageWrapper";
 import Home from "../pages/Home";
 import Search from "../pages/Search";
+import { ThemeProvider } from "./ThemeProvider";
 
 function AppWrapper() {
   const location = useLocation();
 
   return (
-    <AnimatePresence mode="wait">
-      <Routes location={location} key={location.pathname}>
-        <Route path="/" element={<PageWrapper><Home /></PageWrapper>} />
-        <Route path="/search" element={<PageWrapper><Search /></PageWrapper>} />
-        <Route path="/server-search" element={<PageWrapper><ServerSearchPage /></PageWrapper>} />
-        <Route path="/upload" element={<PageWrapper><UploadPage /></PageWrapper>} />
-        <Route path="*" element={<PageWrapper><ErrorPage code={404} /></PageWrapper>} />
-      </Routes>
-    </AnimatePresence>
+    <ThemeProvider>
+      <AnimatePresence mode="wait">
+        <Routes location={location} key={location.pathname}>
+          <Route
+            path="/"
+            element={
+              <PageWrapper>
+                <Home />
+              </PageWrapper>
+            }
+          />
+          <Route
+            path="/search"
+            element={
+              <PageWrapper>
+                <Search />
+              </PageWrapper>
+            }
+          />
+          <Route
+            path="/server-search"
+            element={
+              <PageWrapper>
+                <ServerSearchPage />
+              </PageWrapper>
+            }
+          />
+          <Route
+            path="/upload"
+            element={
+              <PageWrapper>
+                <UploadPage />
+              </PageWrapper>
+            }
+          />
+          <Route
+            path="*"
+            element={
+              <PageWrapper>
+                <ErrorPage code={404} />
+              </PageWrapper>
+            }
+          />
+        </Routes>
+      </AnimatePresence>
+    </ThemeProvider>
   );
 }
 
