@@ -42,7 +42,6 @@ interface Achievement {
   progress?: { current: number; target: number };
 }
 
-
 type WrappedSlide = {
   id: string;
   priority: number;
@@ -60,7 +59,7 @@ interface AchievementDef {
   icon: LucideIcon;
   iconColor: string;
   secret?: boolean;
-  progress?:(data) => { current: number; target: number };
+  progress?: (data) => { current: number; target: number };
 
   check: (data: ProcessedData) => boolean;
 }
