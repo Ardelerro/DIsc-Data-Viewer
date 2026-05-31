@@ -20,7 +20,8 @@ const errorMessages: Record<number, string> = {
 };
 
 const ErrorPage: FC<ErrorPageProps> = ({ code = 404, message }) => {
-  const displayMessage = message ?? errorMessages[code] ?? "Unexpected error occurred.";
+  const displayMessage =
+    message ?? errorMessages[code] ?? "Unexpected error occurred.";
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[var(--color-bg)]">

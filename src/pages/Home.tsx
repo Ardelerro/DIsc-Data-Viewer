@@ -2,15 +2,22 @@ import type { FC } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useState, useMemo, useCallback, lazy } from "react";
+import { useTheme } from "../components/ThemeProvider";
 import { useData } from "../context/DataContext";
 import TopUsers from "../components/displays/topDisplays/TopUsers";
 import TopChannels from "../components/displays/topDisplays/TopChannels";
 import TopServers from "../components/displays/topDisplays/TopServers";
 import TopStreaks from "../components/displays/topDisplays/TopStreaks";
-import { type DateRange, filterMonthly } from "../utils/timeFilterUtils";
+import {
+  type DateRange,
+  filterMonthly,
+  filterHourlyByRange,
+} from "../utils/timeFilterUtils";
 import SelfDisplay from "../components/displays/SelfDisplay";
 const HourlyChart = lazy(() => import("../components/charts/HourlyChart"));
-const HourlyMoodChart = lazy(() => import("../components/charts/HourlyMoodChart"));
+const HourlyMoodChart = lazy(
+  () => import("../components/charts/HourlyMoodChart"),
+);
 import SettingsModal from "../components/displays/SettingsDisplay";
 import type { ShowElementsState } from "../types/types";
 const MonthlyChart = lazy(() => import("../components/charts/MonthlyChart"));
@@ -32,6 +39,7 @@ import TimeRangeSelector from "../components/forms/TimeRangeSelector";
 
 const Home: FC = () => {
   const { data, clearData, hydrating } = useData();
+  const { theme, toggleTheme } = useTheme();
   const [showSettings, setShowSettings] = useState(false);
   const [showElements, setShowElements] = useState<ShowElementsState>({
     topUsers: true,
@@ -43,31 +51,18 @@ const Home: FC = () => {
     moodChart: true,
   });
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
-  const [theme, setTheme] = useState<"light" | "dark">(
-    document.documentElement.classList.contains("dark") ? "dark" : "light",
-  );
   const [showWrapped, setShowWrapped] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
-  const hasDaily = !!(data?.aggregateStats?.daily && Object.keys(data.aggregateStats.daily).length > 0);
+  const hasDaily = !!(
+    data?.aggregateStats?.daily &&
+    Object.keys(data.aggregateStats.daily).length > 0
+  );
   const lastDataDate = useMemo(() => {
     if (!data?.aggregateStats?.daily) return undefined;
     const keys = Object.keys(data.aggregateStats.daily);
     const sorted = [...keys].sort();
     return sorted.length > 0 ? sorted[sorted.length - 1] : undefined;
   }, [data]);
-
-  const toggleTheme = useCallback(() => {
-    setTheme((prev) => {
-      const t = prev === "light" ? "dark" : "light";
-      localStorage.setItem("theme", t);
-      if (t === "dark") {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
-      return t;
-    });
-  }, []);
 
   const handleDownloadData = useCallback(() => {
     if (!data) return;
@@ -90,6 +85,12 @@ const Home: FC = () => {
     () => (memoizedMonthly ? filterMonthly(memoizedMonthly, dateRange) : {}),
     [memoizedMonthly, dateRange],
   );
+  const filteredHourly = useMemo(() => {
+    if (!dateRange) return memoizedHourly ?? {};
+    const dailyHourly = data?.aggregateStats.dailyHourly;
+    if (!dailyHourly) return memoizedHourly ?? {};
+    return filterHourlyByRange(dailyHourly, dateRange);
+  }, [data, dateRange, memoizedHourly]);
 
   const wrappedData = useMemo<WrappedCardData | null>(() => {
     if (!data) return null;
@@ -97,8 +98,14 @@ const Home: FC = () => {
     const topUsers: { username: string; messageCount: number }[] = [];
     for (const [key, stats] of Object.entries(data.channelStats)) {
       if (!stats.recipientName || !key.startsWith("dm_")) continue;
-      const totalMessages = Object.values(stats.hourly || {}).reduce((a, b) => a + b, 0);
-      topUsers.push({ username: stats.recipientName, messageCount: totalMessages });
+      const totalMessages = Object.values(stats.hourly || {}).reduce(
+        (a, b) => a + b,
+        0,
+      );
+      topUsers.push({
+        username: stats.recipientName,
+        messageCount: totalMessages,
+      });
     }
     topUsers.sort((a, b) => b.messageCount - a.messageCount);
 
@@ -106,13 +113,21 @@ const Home: FC = () => {
     for (const [key, stats] of Object.entries(data.channelStats)) {
       if (!key.startsWith("channel_")) continue;
       const channelId = key.replace(/^channel_/, "");
-      const total = Object.values(stats.hourly || {}).reduce((sum, val) => sum + (val ?? 0), 0);
+      const total = Object.values(stats.hourly || {}).reduce(
+        (sum, val) => sum + (val ?? 0),
+        0,
+      );
       const type = data.channelMapping[channelId];
-      if (!["GUILD_TEXT", "PUBLIC_THREAD", "GUILD_VOICE"].includes(type)) continue;
-      const serverId = data.serverMapping.channelToServer[channelId] ?? `unknown (${channelId})`;
+      if (!["GUILD_TEXT", "PUBLIC_THREAD", "GUILD_VOICE"].includes(type))
+        continue;
+      const serverId =
+        data.serverMapping.channelToServer[channelId] ??
+        `unknown (${channelId})`;
       if (!serverStats[serverId]) {
         serverStats[serverId] = {
-          name: data.serverMapping.serverNames[serverId] ?? `Unknown Server (${serverId})`,
+          name:
+            data.serverMapping.serverNames[serverId] ??
+            `Unknown Server (${serverId})`,
           messageCount: 0,
         };
       }
@@ -130,7 +145,12 @@ const Home: FC = () => {
       channelStats: Object.fromEntries(
         Object.entries(data.channelStats).map(([id, ch]) => [
           id,
-          { monthly: ch.monthly, hourly: ch.hourly, daily: ch.daily, name: data.channelNaming[id] },
+          {
+            monthly: ch.monthly,
+            hourly: ch.hourly,
+            daily: ch.daily,
+            name: data.channelNaming[id],
+          },
         ]),
       ),
       activityStats: data.activityStats,
@@ -171,7 +191,6 @@ const Home: FC = () => {
   return (
     <div className="relative min-h-screen w-full bg-[var(--color-bg)] overflow-x-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-8">
-
         {/* ─── Header ─────────────────────────────────────────────── */}
         <div className="flex items-center justify-between pb-4 mb-6 border-b border-[var(--color-border)]">
           <div>
@@ -184,29 +203,57 @@ const Home: FC = () => {
           </div>
 
           <div className="hidden sm:flex items-center gap-0.5">
-            <button onClick={() => setShowSettings(true)} className={iconBtn} title="Settings">
+            <button
+              onClick={() => setShowSettings(true)}
+              className={iconBtn}
+              title="Settings"
+            >
               <Settings className="[var(--icon-size)]" />
             </button>
-            <button onClick={() => setShowConfirmDelete(true)} className={iconBtn} title="Delete data">
+            <button
+              onClick={() => setShowConfirmDelete(true)}
+              className={iconBtn}
+              title="Delete data"
+            >
               <Trash2 className="[var(--icon-size)]" />
             </button>
-            <button onClick={handleDownloadData} className={iconBtn} title="Download data">
+            <button
+              onClick={handleDownloadData}
+              className={iconBtn}
+              title="Download data"
+            >
               <Download className="[var(--icon-size)]" />
             </button>
-            <button onClick={() => setShowWrapped(true)} className={iconBtn} title="Share Wrapped">
+            <button
+              onClick={() => setShowWrapped(true)}
+              className={iconBtn}
+              title="Share Wrapped"
+            >
               <Share2Icon className="[var(--icon-size)]" />
             </button>
-            <button onClick={toggleTheme} className={`${iconBtn} relative w-8 h-8`} title="Toggle theme">
+            <button
+              onClick={toggleTheme}
+              className={`${iconBtn} relative w-8 h-8`}
+              title="Toggle theme"
+            >
               <motion.span
                 className="absolute inset-0 flex items-center justify-center"
-                animate={{ rotate: theme === "dark" ? 0 : 90, scale: theme === "dark" ? 1 : 0, opacity: theme === "dark" ? 1 : 0 }}
+                animate={{
+                  rotate: theme === "light" ? 0 : 90,
+                  scale: theme === "light" ? 1 : 0,
+                  opacity: theme === "light" ? 1 : 0,
+                }}
                 transition={{ duration: 0.2, ease: "easeInOut" }}
               >
                 <Sun className="[var(--icon-size)]" />
               </motion.span>
               <motion.span
                 className="absolute inset-0 flex items-center justify-center"
-                animate={{ rotate: theme === "light" ? 0 : -90, scale: theme === "light" ? 1 : 0, opacity: theme === "light" ? 1 : 0 }}
+                animate={{
+                  rotate: theme === "dark" ? 0 : -90,
+                  scale: theme === "dark" ? 1 : 0,
+                  opacity: theme === "dark" ? 1 : 0,
+                }}
                 transition={{ duration: 0.2, ease: "easeInOut" }}
               >
                 <Moon className="[var(--icon-size)]" />
@@ -258,12 +305,16 @@ const Home: FC = () => {
           )}
           {showElements.hourlyCharts && (
             <HourlyChart
-              data={memoizedHourly!}
+              data={filteredHourly}
               className="col-span-1 lg:col-span-2"
             />
           )}
           <div className="col-span-1 lg:col-span-2 flex flex-wrap items-center gap-3 px-0.5 mt-2">
-            <TimeRangeSelector hasDaily={hasDaily} anchorDate={lastDataDate} onChange={setDateRange} />
+            <TimeRangeSelector
+              hasDaily={hasDaily}
+              anchorDate={lastDataDate}
+              onChange={setDateRange}
+            />
           </div>
           {showElements.monthlyCharts && (
             <MonthlyChart
@@ -291,34 +342,57 @@ const Home: FC = () => {
             animate={fabOnLeft ? "open" : "closed"}
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
             variants={{
-              open:   { width: "auto", opacity: 1, pointerEvents: "auto", x: 0 },
+              open: { width: "auto", opacity: 1, pointerEvents: "auto", x: 0 },
               closed: { width: 0, opacity: 0, pointerEvents: "none", x: -10 },
             }}
             className="flex items-center gap-1 overflow-hidden rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-0"
           >
-            <button onClick={() => setShowSettings(true)} className="p-5 rounded-full cursor-pointer active:scale-90 transition text-[var(--color-text-3)]">
+            <button
+              onClick={() => setShowSettings(true)}
+              className="p-5 rounded-full cursor-pointer active:scale-90 transition text-[var(--color-text-3)]"
+            >
               <Settings className="w-8 h-8" />
             </button>
-            <button onClick={() => setShowConfirmDelete(true)} className="p-5 rounded-full cursor-pointer active:scale-90 transition text-[var(--color-text-3)]">
+            <button
+              onClick={() => setShowConfirmDelete(true)}
+              className="p-5 rounded-full cursor-pointer active:scale-90 transition text-[var(--color-text-3)]"
+            >
               <Trash2 className="w-8 h-8" />
             </button>
-            <button onClick={handleDownloadData} className="p-5 rounded-full cursor-pointer active:scale-90 transition text-[var(--color-text-3)]">
+            <button
+              onClick={handleDownloadData}
+              className="p-5 rounded-full cursor-pointer active:scale-90 transition text-[var(--color-text-3)]"
+            >
               <Download className="w-8 h-8" />
             </button>
-            <button onClick={() => setShowWrapped(true)} className="p-5 rounded-full cursor-pointer active:scale-90 transition text-[var(--color-text-3)]">
+            <button
+              onClick={() => setShowWrapped(true)}
+              className="p-5 rounded-full cursor-pointer active:scale-90 transition text-[var(--color-text-3)]"
+            >
               <Share2Icon className="w-8 h-8" />
             </button>
-            <button onClick={toggleTheme} className="relative p-5 rounded-full cursor-pointer active:scale-90 transition text-[var(--color-text-3)]">
+            <button
+              onClick={toggleTheme}
+              className="relative p-5 rounded-full cursor-pointer active:scale-90 transition text-[var(--color-text-3)]"
+            >
               <motion.span
                 className="absolute inset-0 flex items-center justify-center"
-                animate={{ rotate: theme === "dark" ? 0 : 90, scale: theme === "dark" ? 1 : 0, opacity: theme === "dark" ? 1 : 0 }}
+                animate={{
+                  rotate: theme === "dark" ? 0 : 90,
+                  scale: theme === "dark" ? 1 : 0,
+                  opacity: theme === "dark" ? 1 : 0,
+                }}
                 transition={{ duration: 0.2, ease: "easeInOut" }}
               >
                 <Sun className="w-8 h-8" />
               </motion.span>
               <motion.span
                 className="absolute inset-0 flex items-center justify-center"
-                animate={{ rotate: theme === "light" ? 0 : -90, scale: theme === "light" ? 1 : 0, opacity: theme === "light" ? 1 : 0 }}
+                animate={{
+                  rotate: theme === "light" ? 0 : -90,
+                  scale: theme === "light" ? 1 : 0,
+                  opacity: theme === "light" ? 1 : 0,
+                }}
                 transition={{ duration: 0.2, ease: "easeInOut" }}
               >
                 <Moon className="w-8 h-8" />
@@ -367,7 +441,8 @@ const Home: FC = () => {
                   Delete all data?
                 </h3>
                 <p className="text-xs text-[var(--color-text-2)] mt-1">
-                  This will permanently delete all your data and cannot be undone.
+                  This will permanently delete all your data and cannot be
+                  undone.
                 </p>
               </div>
               <div className="flex justify-end gap-2">
@@ -378,7 +453,10 @@ const Home: FC = () => {
                   Cancel
                 </button>
                 <button
-                  onClick={() => { clearData(); setShowConfirmDelete(false); }}
+                  onClick={() => {
+                    clearData();
+                    setShowConfirmDelete(false);
+                  }}
                   className="px-3 py-1.5 rounded-md text-xs font-medium bg-[var(--color-negative)] hover:opacity-90 text-white transition-opacity duration-150"
                 >
                   Delete
@@ -391,7 +469,10 @@ const Home: FC = () => {
 
       {showWrapped &&
         createPortal(
-          <WrappedCarousel data={wrappedData!} onClose={() => setShowWrapped(false)} />,
+          <WrappedCarousel
+            data={wrappedData!}
+            onClose={() => setShowWrapped(false)}
+          />,
           document.body,
         )}
     </div>
