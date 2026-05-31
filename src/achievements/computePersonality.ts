@@ -503,9 +503,7 @@ export function computePersonality(data: ProcessedData): Personality {
   };
 }
 
-export function computeAllPersonalityScores(
-  data: ProcessedData,
-): {
+export function computeAllPersonalityScores(data: ProcessedData): {
   personality: Omit<Personality, "signals">;
   score: number;
   signals: string[];
