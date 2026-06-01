@@ -85,7 +85,7 @@ export async function enrichUserMapping(
   const persisted = await getCachedUsers([...ids]);
   for (const id of ids) {
     const hit = memCache.get(id) ?? persisted[id];
-    if (hit && now - hit.fetchedAt < TTL_MS) {
+    if (hit && now - hit.fetchedAt < ttlFor(hit)) {
       resolved.set(id, hit);
       memCache.set(id, hit);
     } else {
@@ -97,14 +97,21 @@ export async function enrichUserMapping(
   for (let i = 0; i < toFetch.length; i += BATCH) {
     if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
     const batch = toFetch.slice(i, i + BATCH);
-    let users: Record<string, ApiUser | null>;
+    let result: BatchResult;
     try {
-      users = await fetchBatch(batch, signal);
+      result = await fetchBatch(batch, signal);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") throw err;
 
       console.warn("Discord user enrichment failed; using export values:", err);
       break;
+    }
+    const { users, retryAfterSec } = result;
+    if (retryAfterSec) {
+      console.warn(
+        `[discord-user] rate-limited by Discord (retry-after ~${retryAfterSec}s); ` +
+          `unresolved users will retry after ~${TRANSIENT_TTL_MS / 60000}min.`,
+      );
     }
     for (const id of batch) {
       const u = users[id];
@@ -119,12 +126,17 @@ export async function enrichUserMapping(
         memCache.set(id, entry);
         fresh[id] = entry;
       } else {
-        memCache.set(id, {
+        // `null` → confirmed absent (cache long); key omitted → transient
+        // rate-limit (cache briefly so it retries once the limit clears).
+        const entry: CachedDiscordUser = {
           username: "",
           global_name: null,
           avatar: null,
           fetchedAt: now,
-        });
+          transient: !(id in users),
+        };
+        memCache.set(id, entry);
+        fresh[id] = entry;
       }
     }
   }

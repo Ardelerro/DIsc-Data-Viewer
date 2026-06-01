@@ -6,19 +6,13 @@ interface DiscordUser {
 
 const API = "https://discord.com/api/v10";
 
-// The global rate limit is shared across ALL invocations of this function (one
-// bot token), so a smaller burst per request lowers the chance of tripping it
-// and shrinks the blast radius when several visitors hit the endpoint at once.
+// The global rate limit and Cloudflare's per-IP "invalid request" budget are
+// both shared across ALL invocations of this function (one bot token, one
+// shared Vercel egress IP). A smaller burst lowers the chance of tripping them.
 const CONCURRENCY = 4;
 
-// A 429 asking us to wait longer than this almost always means we hit the
-// *global* limit. Rather than block the request on a long backoff, bail and let
-// the client fall back to the export-file username.
-const MAX_RETRY_AFTER_SEC = 5;
-
 // Overall budget for the whole request. A normal 50-id batch resolves in a few
-// seconds; this only bites under heavy rate-limiting, where it caps worst-case
-// latency (and serverless cost) instead of blocking ~30s on backoff sleeps.
+// seconds; this caps worst-case latency (and serverless cost).
 const DEADLINE_MS = 10_000;
 
 // Hard backstop enforced by Vercel, above the app-level deadline.
@@ -29,73 +23,102 @@ class DiscordAuthError extends Error {}
 const sleep = (ms: number): Promise<void> =>
   new Promise((r) => setTimeout(r, ms));
 
+// A single user lookup either resolves, is confirmed absent (404 — a deleted
+// account), or is transiently unavailable (rate-limited / errored). The caller
+// caches these three outcomes very differently, so they must stay distinct.
+type Outcome =
+  | { kind: "ok"; user: DiscordUser }
+  | { kind: "absent" }
+  | { kind: "unavailable" };
+
+const ABSENT: Outcome = { kind: "absent" };
+const UNAVAILABLE: Outcome = { kind: "unavailable" };
+
 interface Gate {
-  // Epoch ms before which every worker must hold (global rate-limit pause).
+  // Epoch ms before which every worker must hold (route-bucket pause).
   pauseUntil: number;
   // Epoch ms after which we stop fetching and return what we have.
   deadline: number;
+  // Set the moment any worker sees a 429. Retrying *into* a rate limit just
+  // produces more 429s, which count toward Cloudflare's per-IP invalid-request
+  // budget and can escalate a brief limit into a 1-hour IP ban — so instead we
+  // stop the whole invocation and let the client retry later.
+  stop: boolean;
+  // Largest retry-after (seconds) seen, surfaced to the client as a hint.
+  retryAfterSec: number;
+}
+
+// Logged once per 429 so we can tell a normal Discord limit (JSON body,
+// x-ratelimit-scope present) apart from a Cloudflare IP ban (HTML body, cf-ray
+// present, no ratelimit headers, ~1h).
+async function logRateLimit(res: Response, id: string): Promise<void> {
+  let body = "";
+  try {
+    body = (await res.text()).slice(0, 160).replace(/\s+/g, " ");
+  } catch {
+    /* ignore */
+  }
+  console.warn(
+    `[discord-user] 429 id=${id} ` +
+      `scope=${res.headers.get("x-ratelimit-scope")} ` +
+      `global=${res.headers.get("x-ratelimit-global")} ` +
+      `retry-after=${res.headers.get("retry-after")} ` +
+      `cf-ray=${res.headers.get("cf-ray")} ` +
+      `server=${res.headers.get("server")} body=${body}`,
+  );
 }
 
 async function fetchUser(
   id: string,
   token: string,
   gate: Gate,
-): Promise<DiscordUser | null> {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    // Respect a global pause set by any worker, and never sleep past the deadline.
-    const wait = gate.pauseUntil - Date.now();
-    if (wait > 0) {
-      if (Date.now() + wait >= gate.deadline) return null;
-      await sleep(wait);
-    }
-    if (Date.now() >= gate.deadline) return null;
+): Promise<Outcome> {
+  if (gate.stop || Date.now() >= gate.deadline) return UNAVAILABLE;
 
-    const res = await fetch(`${API}/users/${id}`, {
-      headers: { Authorization: `Bot ${token}` },
-    });
+  // Respect a pacing pause set by any worker, and never sleep past the deadline.
+  const wait = gate.pauseUntil - Date.now();
+  if (wait > 0) {
+    if (Date.now() + wait >= gate.deadline) return UNAVAILABLE;
+    await sleep(wait);
+  }
+  if (gate.stop) return UNAVAILABLE;
 
-    if (res.status === 429) {
-      const retry = Number(res.headers.get("retry-after")) || 1;
-      if (retry > MAX_RETRY_AFTER_SEC) return null;
-      const resumeAt = Date.now() + retry * 1000 + Math.random() * 250;
-      // A global-scope limit applies to the whole token: hold every worker, not
-      // just this one request.
-      if (res.headers.get("x-ratelimit-scope") === "global") {
-        gate.pauseUntil = Math.max(gate.pauseUntil, resumeAt);
-      }
-      if (resumeAt >= gate.deadline) return null;
-      await sleep(resumeAt - Date.now());
-      continue;
-    }
-    if (res.status === 401 || res.status === 403) {
-      throw new DiscordAuthError(
-        `Discord rejected the bot token (${res.status}).`,
-      );
-    }
-    if (res.status === 404) return null;
-    if (!res.ok) throw new Error(`Discord API ${res.status}`);
+  const res = await fetch(`${API}/users/${id}`, {
+    headers: { Authorization: `Bot ${token}` },
+  });
 
-    // Proactive pacing: every /users/:id request shares one route bucket, so
-    // when it's exhausted make the remaining workers wait out the reset before
-    // firing — this avoids triggering the 429 in the first place.
-    if (res.headers.get("x-ratelimit-remaining") === "0") {
-      const resetAfter = Number(res.headers.get("x-ratelimit-reset-after"));
-      if (resetAfter > 0) {
-        gate.pauseUntil = Math.max(
-          gate.pauseUntil,
-          Date.now() + resetAfter * 1000,
-        );
-      }
-    }
+  if (res.status === 429) {
+    await logRateLimit(res, id);
+    const retry = Number(res.headers.get("retry-after")) || 1;
+    gate.retryAfterSec = Math.max(gate.retryAfterSec, retry);
+    gate.stop = true; // halt the whole invocation; the client retries later
+    return UNAVAILABLE;
+  }
+  if (res.status === 401 || res.status === 403) {
+    throw new DiscordAuthError(`Discord rejected the bot token (${res.status}).`);
+  }
+  if (res.status === 404) return ABSENT;
+  if (!res.ok) return UNAVAILABLE;
 
-    const u = (await res.json()) as Partial<DiscordUser>;
-    return {
+  // Proactive pacing: every /users/:id request shares one route bucket, so when
+  // it's exhausted make the remaining workers wait out the reset before firing
+  // — this avoids triggering the 429 in the first place.
+  if (res.headers.get("x-ratelimit-remaining") === "0") {
+    const resetAfter = Number(res.headers.get("x-ratelimit-reset-after"));
+    if (resetAfter > 0) {
+      gate.pauseUntil = Math.max(gate.pauseUntil, Date.now() + resetAfter * 1000);
+    }
+  }
+
+  const u = (await res.json()) as Partial<DiscordUser>;
+  return {
+    kind: "ok",
+    user: {
       username: u.username ?? "Unknown",
       global_name: u.global_name ?? null,
       avatar: u.avatar ?? null,
-    };
-  }
-  return null;
+    },
+  };
 }
 
 export default async function handler(
@@ -125,22 +148,38 @@ export default async function handler(
     return;
   }
 
+  // Only resolved users and confirmed-absent ids (null) go in the map; ids that
+  // were rate-limited/errored are omitted so the client can tell "deleted" from
+  // "try again later" and cache them accordingly.
   const users: Record<string, DiscordUser | null> = {};
   let authError: DiscordAuthError | null = null;
-  const gate: Gate = { pauseUntil: 0, deadline: Date.now() + DEADLINE_MS };
+  const gate: Gate = {
+    pauseUntil: 0,
+    deadline: Date.now() + DEADLINE_MS,
+    stop: false,
+    retryAfterSec: 0,
+  };
 
   let cursor = 0;
   async function worker(): Promise<void> {
-    while (cursor < ids.length && !authError && Date.now() < gate.deadline) {
+    while (
+      cursor < ids.length &&
+      !authError &&
+      !gate.stop &&
+      Date.now() < gate.deadline
+    ) {
       const id = ids[cursor++];
       try {
-        users[id] = await fetchUser(id, token, gate);
+        const outcome = await fetchUser(id, token, gate);
+        if (outcome.kind === "ok") users[id] = outcome.user;
+        else if (outcome.kind === "absent") users[id] = null;
+        // "unavailable" → leave the id out of the map entirely
       } catch (e) {
         if (e instanceof DiscordAuthError) {
           authError = e;
           return;
         }
-        users[id] = null;
+        // transient error → omit
       }
     }
   }
@@ -151,7 +190,12 @@ export default async function handler(
     );
     if (authError) throw authError;
     res.setHeader("Cache-Control", "no-store");
-    res.status(200).json({ users });
+    const payload: {
+      users: Record<string, DiscordUser | null>;
+      retryAfterSec?: number;
+    } = { users };
+    if (gate.retryAfterSec > 0) payload.retryAfterSec = gate.retryAfterSec;
+    res.status(200).json(payload);
   } catch (e) {
     const auth = e instanceof DiscordAuthError;
     res
