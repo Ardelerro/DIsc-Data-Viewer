@@ -7,6 +7,11 @@ import {
 
 const TTL_MS = 1000 * 60 * 60 * 24 * 7;
 
+// Transient failures (the endpoint was rate-limited) are cached only briefly so
+// they're retried automatically once Discord's limit / IP ban clears, instead
+// of being trusted for a week like a genuine "no such user" result.
+const TRANSIENT_TTL_MS = 1000 * 60 * 10;
+
 const BATCH = 50;
 
 const memCache = new Map<string, CachedDiscordUser>();
@@ -17,10 +22,21 @@ interface ApiUser {
   avatar: string | null;
 }
 
+interface BatchResult {
+  // Present + object → resolved. Present + null → confirmed absent (deleted).
+  // Absent key → transient (rate-limited / errored upstream), retry later.
+  users: Record<string, ApiUser | null>;
+  retryAfterSec?: number;
+}
+
+function ttlFor(hit: CachedDiscordUser): number {
+  return hit.transient ? TRANSIENT_TTL_MS : TTL_MS;
+}
+
 async function fetchBatch(
   ids: string[],
   signal?: AbortSignal,
-): Promise<Record<string, ApiUser | null>> {
+): Promise<BatchResult> {
   const res = await fetch(`/api/discord-user?ids=${ids.join(",")}`, { signal });
   if (!res.ok) {
     let detail = "";
@@ -38,8 +54,8 @@ async function fetchBatch(
       `discord-user endpoint ${res.status}${detail ? `: ${detail}` : ""}`,
     );
   }
-  const body = (await res.json()) as { users: Record<string, ApiUser | null> };
-  return body.users ?? {};
+  const body = (await res.json()) as BatchResult;
+  return { users: body.users ?? {}, retryAfterSec: body.retryAfterSec };
 }
 
 function displayName(u: {
