@@ -25,6 +25,7 @@ import {
   type DateRange,
   countInRange,
   filterMonthly,
+  filterHourlyByRange,
 } from "../../utils/timeFilterUtils";
 import Search from "./Search";
 
@@ -128,6 +129,13 @@ const UserSearch: FC = () => {
     () => (channelData ? filterMonthly(channelData.monthly, dateRange) : {}),
     [channelData, dateRange],
   );
+  const filteredHourly = useMemo(() => {
+    if (!channelData) return {};
+    if (!dateRange) return channelData.hourly;
+    const dh = channelData.dailyHourly;
+    if (!dh) return channelData.hourly;
+    return filterHourlyByRange(dh, dateRange);
+  }, [channelData, dateRange]);
 
   const hasDaily = !!(
     channelData?.daily && Object.keys(channelData.daily).length > 0
@@ -341,7 +349,7 @@ const UserSearch: FC = () => {
               />
             </div>
 
-            {showElements.hourly && <HourlyChart data={channelData.hourly} />}
+            {showElements.hourly && <HourlyChart data={filteredHourly} />}
             {showElements.monthly && <MonthlyChart data={filteredMonthly} />}
           </motion.div>
         )}

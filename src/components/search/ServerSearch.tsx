@@ -12,6 +12,7 @@ import {
   type DateRange,
   countInRange,
   filterMonthly,
+  filterHourlyByRange,
 } from "../../utils/timeFilterUtils";
 import Search from "./Search";
 
@@ -76,13 +77,22 @@ const ServerSearch: FC = () => {
       }
     }
 
-    const merged: ChannelStats = { hourly: {}, monthly: {} };
+    const merged: ChannelStats = { hourly: {}, monthly: {}, dailyHourly: {} };
     for (const d of allData) {
       for (const [hour, count] of Object.entries(d.hourly)) {
         merged.hourly[hour] = (merged.hourly[hour] || 0) + count;
       }
       for (const [month, count] of Object.entries(d.monthly)) {
         merged.monthly[month] = (merged.monthly[month] || 0) + count;
+      }
+      if (d.dailyHourly) {
+        for (const [date, hours] of Object.entries(d.dailyHourly)) {
+          const row =
+            merged.dailyHourly![date] || (merged.dailyHourly![date] = {});
+          for (const [h, c] of Object.entries(hours)) {
+            row[h] = (row[h] || 0) + c;
+          }
+        }
       }
     }
 
@@ -107,6 +117,14 @@ const ServerSearch: FC = () => {
       aggregateData ? filterMonthly(aggregateData.monthly, dateRange) : {},
     [aggregateData, dateRange],
   );
+
+  const filteredHourly = useMemo(() => {
+    if (!aggregateData) return {};
+    if (!dateRange) return aggregateData.hourly;
+    const dh = aggregateData.dailyHourly;
+    if (!dh) return aggregateData.hourly;
+    return filterHourlyByRange(dh, dateRange);
+  }, [aggregateData, dateRange]);
 
   const lastDataDate = useMemo(() => {
     if (!aggregateData) return undefined;
@@ -239,7 +257,7 @@ const ServerSearch: FC = () => {
             ]}
           />
 
-          <HourlyChart data={aggregateData.hourly} />
+          <HourlyChart data={filteredHourly} />
           <MonthlyChart data={filteredMonthly} />
 
           <div>
