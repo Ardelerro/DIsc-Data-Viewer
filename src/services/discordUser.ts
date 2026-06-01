@@ -7,9 +7,9 @@ import {
 
 const TTL_MS = 1000 * 60 * 60 * 24 * 7;
 
-// Transient failures (the endpoint was rate-limited) are cached only briefly so
-// they're retried automatically once Discord's limit / IP ban clears, instead
-// of being trusted for a week like a genuine "no such user" result.
+
+
+
 const TRANSIENT_TTL_MS = 1000 * 60 * 10;
 
 const BATCH = 50;
@@ -23,8 +23,8 @@ interface ApiUser {
 }
 
 interface BatchResult {
-  // Present + object → resolved. Present + null → confirmed absent (deleted).
-  // Absent key → transient (rate-limited / errored upstream), retry later.
+  
+  
   users: Record<string, ApiUser | null>;
   retryAfterSec?: number;
 }
@@ -68,22 +68,25 @@ function displayName(u: {
 export async function enrichUserMapping(
   self: Self,
   userMapping: Record<string, { username: string; avatar: string }>,
-
-  extraIds: string[],
+  
+  
+  
+  
+  
+  ids: string[],
   signal?: AbortSignal,
 ): Promise<void> {
-  const ids = new Set<string>();
-  if (self?.id) ids.add(self.id);
-  for (const id in userMapping) ids.add(id);
-  for (const id of extraIds) if (id && id !== "unknown") ids.add(id);
-  if (ids.size === 0) return;
+  const wanted = new Set<string>();
+  if (self?.id) wanted.add(self.id);
+  for (const id of ids) if (id && id !== "unknown") wanted.add(id);
+  if (wanted.size === 0) return;
 
   const now = Date.now();
   const resolved = new Map<string, CachedDiscordUser>();
   const toFetch: string[] = [];
 
-  const persisted = await getCachedUsers([...ids]);
-  for (const id of ids) {
+  const persisted = await getCachedUsers([...wanted]);
+  for (const id of wanted) {
     const hit = memCache.get(id) ?? persisted[id];
     if (hit && now - hit.fetchedAt < ttlFor(hit)) {
       resolved.set(id, hit);
@@ -107,12 +110,6 @@ export async function enrichUserMapping(
       break;
     }
     const { users, retryAfterSec } = result;
-    if (retryAfterSec) {
-      console.warn(
-        `[discord-user] rate-limited by Discord (retry-after ~${retryAfterSec}s); ` +
-          `unresolved users will retry after ~${TRANSIENT_TTL_MS / 60000}min.`,
-      );
-    }
     for (const id of batch) {
       const u = users[id];
       if (u && u.username) {
@@ -126,8 +123,8 @@ export async function enrichUserMapping(
         memCache.set(id, entry);
         fresh[id] = entry;
       } else {
-        // `null` → confirmed absent (cache long); key omitted → transient
-        // rate-limit (cache briefly so it retries once the limit clears).
+        
+        
         const entry: CachedDiscordUser = {
           username: "",
           global_name: null,
@@ -138,6 +135,20 @@ export async function enrichUserMapping(
         memCache.set(id, entry);
         fresh[id] = entry;
       }
+    }
+    
+    
+    
+    
+    
+    if (retryAfterSec) {
+      const remaining = toFetch.length - (i + batch.length);
+      console.warn(
+        `[discord-user] rate-limited by Discord (retry-after ~${retryAfterSec}s); ` +
+          `stopping enrichment for this session — ${remaining} user(s) left ` +
+          `unresolved keep export names and retry after ~${TRANSIENT_TTL_MS / 60000}min.`,
+      );
+      break;
     }
   }
 

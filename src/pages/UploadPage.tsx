@@ -45,21 +45,21 @@ const UploadPage: FC = () => {
     }
 
     const elapsed = now - startTimeRef.current;
-    // Need a tiny bit of data before guessing — show "calculating" instead of a lie.
+    
     if (elapsed < 400 || p < 0.5) {
       setEta(null);
       return;
     }
 
-    // Maintain a sliding ~3s window of samples for the recent-rate estimate.
+    
     const samples = samplesRef.current;
     samples.push({ p, t: now });
     while (samples.length > 0 && now - samples[0].t > 3000) samples.shift();
 
-    // %/ms across the whole upload (stable).
+    
     const cumulativeRate = p / elapsed;
 
-    // %/ms across just the recent window (responsive).
+    
     let recentRate = cumulativeRate;
     if (samples.length >= 2) {
       const first = samples[0];
@@ -69,7 +69,7 @@ const UploadPage: FC = () => {
       if (dt > 150 && dp > 0) recentRate = dp / dt;
     }
 
-    // Blend: trust the recent window more once it has matured (>=1.5s of data).
+    
     const windowSpan = samples.length > 0 ? now - samples[0].t : 0;
     const recentWeight = Math.min(1, windowSpan / 1500);
     const rate =
@@ -77,7 +77,7 @@ const UploadPage: FC = () => {
 
     const remainingMs = rate > 0 ? (100 - p) / rate : 0;
 
-    // Throttle ETA display updates to ~4Hz to keep the number readable.
+    
     if (now - lastEtaTickRef.current < 250) return;
     lastEtaTickRef.current = now;
     setEta(Math.max(0, remainingMs / 1000));
@@ -110,7 +110,7 @@ const UploadPage: FC = () => {
 
       setTimeout(() => navigate("/"), 500);
     } catch (err) {
-      // AbortError = user cancelled: reset quietly, no error banner.
+      
       if (!(err instanceof Error && err.name === "AbortError")) {
         setError(err instanceof Error ? err.message : "Failed to process file");
       }
@@ -119,7 +119,7 @@ const UploadPage: FC = () => {
       resetTracking();
     } finally {
       abortRef.current = null;
-      // Clear the input so the same file can be re-selected after a cancel.
+      
       e.target.value = "";
     }
   };

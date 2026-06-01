@@ -146,10 +146,10 @@ export interface CachedDiscordUser {
   global_name: string | null;
   avatar: string | null;
   fetchedAt: number;
-  // Set on entries that failed for a transient reason (rate limit / error)
-  // rather than a confirmed "not found". These expire on a much shorter TTL so
-  // they're retried once the rate limit clears, instead of being trusted for a
-  // week like a genuine empty result.
+  
+  
+  
+  
   transient?: boolean;
 }
 

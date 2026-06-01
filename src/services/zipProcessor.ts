@@ -121,9 +121,19 @@ async function processZipData(
   );
   stopChannelPass();
 
+  
+  
+  
+  
   const recipientIds: string[] = [];
-  for (const recips of Object.values(channelRecipients)) {
-    for (const r of recips) if (r !== self.id) recipientIds.push(r);
+  const seenRecipients = new Set<string>();
+  for (const [channelId, recips] of Object.entries(channelRecipients)) {
+    if (channelMapping[channelId] !== "DM") continue;
+    for (const r of recips) {
+      if (r === self.id || r === "unknown" || seenRecipients.has(r)) continue;
+      seenRecipients.add(r);
+      recipientIds.push(r);
+    }
   }
   const enrichPromise = enrichUserMapping(
     self,
@@ -407,7 +417,11 @@ async function refreshUserNames(
 ): Promise<boolean> {
   const before = namesSignature(data);
 
-  const recipientIds: string[] = [];
+  
+  
+  
+  const byActivity: { id: string; count: number }[] = [];
+  const seen = new Set<string>();
   for (const key in data.channelStats) {
     if (!key.startsWith("dm_")) continue;
     const stats = data.channelStats[key];
@@ -416,8 +430,15 @@ async function refreshUserNames(
       if (m) stats.recipientId = m[1];
     }
     const rid = stats.recipientId;
-    if (rid && rid !== "unknown") recipientIds.push(rid);
+    if (!rid || rid === "unknown" || seen.has(rid)) continue;
+    seen.add(rid);
+    const count =
+      stats.messageCount ??
+      Object.values(stats.hourly).reduce((sum, c) => sum + c, 0);
+    byActivity.push({ id: rid, count });
   }
+  byActivity.sort((a, b) => b.count - a.count);
+  const recipientIds = byActivity.map((e) => e.id);
 
   await enrichUserMapping(data.self, data.userMapping, recipientIds, signal);
   applyDmRecipientNames(data.channelStats, data.dmManifest, data.userMapping);
