@@ -15,6 +15,7 @@ interface ChannelStats {
   hourly: Record<string, number>;
   monthly: Record<string, number>;
   daily?: Record<string, number>;
+  dailyHourly?: Record<string, Record<string, number>>;
   recipientName?: string;
   recipientId?: string;
   averageGapBetweenMessages?: number;

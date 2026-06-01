@@ -91,6 +91,7 @@ interface ChannelAcc {
   hourly: Record<string, number>;
   monthly: Record<string, number>;
   daily: Record<string, number>;
+  dailyHourly: Record<string, Record<string, number>>;
   localWordFreq: Record<string, number>;
   localHourlyAnalyzed: Record<string, number>;
   localHourlySentiment: Record<string, number>;
@@ -114,6 +115,7 @@ function createAcc(): ChannelAcc {
     hourly: {},
     monthly: {},
     daily: {},
+    dailyHourly: {},
     localWordFreq: {},
     localHourlyAnalyzed: {},
     localHourlySentiment: {},
@@ -239,7 +241,7 @@ function foldMessage(contents: unknown, timestampStr: string, acc: ChannelAcc) {
   acc.monthly[month] = (acc.monthly[month] || 0) + 1;
   acc.daily[date] = (acc.daily[date] || 0) + 1;
   acc.messageCount++;
-  const dhRow = agg.dailyHourly[date] || (agg.dailyHourly[date] = {});
+  const dhRow = acc.dailyHourly[date] || (acc.dailyHourly[date] = {});
   dhRow[hour] = (dhRow[hour] || 0) + 1;
 
   const sec = (ts / 1000) | 0;
@@ -333,6 +335,11 @@ function finalizeChannel(acc: ChannelAcc): ChannelStats {
   for (const m in acc.monthly)
     agg.monthly[m] = (agg.monthly[m] || 0) + acc.monthly[m];
   for (const d in acc.daily) agg.daily[d] = (agg.daily[d] || 0) + acc.daily[d];
+  for (const date in acc.dailyHourly) {
+    const aggRow = agg.dailyHourly[date] || (agg.dailyHourly[date] = {});
+    const accRow = acc.dailyHourly[date];
+    for (const h in accRow) aggRow[h] = (aggRow[h] || 0) + accRow[h];
+  }
   for (const h in acc.localHourlySentiment)
     agg.hourlySentimentTotal[h] =
       (agg.hourlySentimentTotal[h] || 0) + acc.localHourlySentiment[h];
@@ -362,6 +369,7 @@ function finalizeChannel(acc: ChannelAcc): ChannelStats {
     hourly: acc.hourly,
     monthly: acc.monthly,
     daily: acc.daily,
+    dailyHourly: acc.dailyHourly,
     sentiment: {
       average: acc.sentWeightSum > 0 ? acc.sentAvgSum / acc.sentWeightSum : 0,
       positive: acc.sentPos,
