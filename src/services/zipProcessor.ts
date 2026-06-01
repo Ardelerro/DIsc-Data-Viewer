@@ -271,7 +271,6 @@ async function processZipData(
 
   const dmManifest: string[] = [];
   const channelManifest: string[] = [];
-  const deletedUserCount = { n: 0 };
   for (const filename of messageFilenames) {
     const m = filename.match(/c(\d+)/);
     if (!m) continue;
@@ -284,15 +283,8 @@ async function processZipData(
 
     if (type === "DM") {
       const recipients = channelRecipients[channelId];
-      const recipientId =
+      stats.recipientId =
         recipients?.find((r: string) => r !== self.id) ?? "unknown";
-      let name =
-        userMapping[recipientId]?.username ?? `Unknown (${recipientId})`;
-      if (name === "Deleted User") {
-        deletedUserCount.n++;
-        name = `Deleted User${deletedUserCount.n}`;
-      }
-      stats.recipientName = name;
       dmManifest.push(`dm_${channelId}.json`);
     } else {
       stats.recipientName =
@@ -303,6 +295,8 @@ async function processZipData(
       channelManifest.push(`channel_${channelId}.json`);
     }
   }
+
+  applyDmRecipientNames(channelStats, dmManifest, userMapping);
 
   if (Object.keys(globalWordFreq).length > 5000) {
     for (const k in globalWordFreq) {
@@ -381,6 +375,56 @@ function mergeAggregate(
   target.messageCount += src.messageCount;
 }
 
+function applyDmRecipientNames(
+  channelStats: Record<string, ChannelStats>,
+  dmManifest: string[],
+  userMapping: Record<string, { username: string; avatar: string }>,
+): void {
+  let deletedUsers = 0;
+  for (const manifest of dmManifest) {
+    const stats = channelStats[manifest.replace(/\.json$/, "")];
+    const recipientId = stats?.recipientId;
+    if (!recipientId) continue;
+    let name = userMapping[recipientId]?.username ?? `Unknown (${recipientId})`;
+    if (name === "Deleted User") name = `Deleted User${++deletedUsers}`;
+    stats.recipientName = name;
+  }
+}
+
+function namesSignature(data: ProcessedData): string {
+  const dm: Record<string, string> = {};
+  for (const key in data.channelStats) {
+    if (!key.startsWith("dm_")) continue;
+    const s = data.channelStats[key];
+    dm[key] = `${s.recipientId ?? ""}|${s.recipientName ?? ""}`;
+  }
+  return JSON.stringify([data.self, data.userMapping, dm]);
+}
+
+async function refreshUserNames(
+  data: ProcessedData,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  const before = namesSignature(data);
+
+  const recipientIds: string[] = [];
+  for (const key in data.channelStats) {
+    if (!key.startsWith("dm_")) continue;
+    const stats = data.channelStats[key];
+    if (!stats.recipientId) {
+      const m = stats.recipientName?.match(/^Unknown \((\d+)\)$/);
+      if (m) stats.recipientId = m[1];
+    }
+    const rid = stats.recipientId;
+    if (rid && rid !== "unknown") recipientIds.push(rid);
+  }
+
+  await enrichUserMapping(data.self, data.userMapping, recipientIds, signal);
+  applyDmRecipientNames(data.channelStats, data.dmManifest, data.userMapping);
+
+  return namesSignature(data) !== before;
+}
+
 async function extractAccountData(
   userEntry: FileEntry,
   usersEntry: FileEntry | undefined,
@@ -439,4 +483,4 @@ function mergeUsers(
   }
 }
 
-export { processZipData };
+export { processZipData, refreshUserNames };
