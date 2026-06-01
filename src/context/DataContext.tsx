@@ -14,7 +14,7 @@ import type {
   UploadOptions,
 } from "../types/discord";
 import { processActivities } from "../services/activityProcessor";
-import { processZipData } from "../services/zipProcessor";
+import { processZipData, refreshUserNames } from "../services/zipProcessor";
 import {
   processSentiment,
   type SentimentResult,
@@ -85,15 +85,29 @@ export const DataProvider: FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
     loadStoredData()
       .then((stored) => {
-        if (!cancelled && stored) setData(stored);
+        if (cancelled || !stored) return;
+        setData(stored);
+        refreshUserNames(stored, controller.signal)
+          .then((changed) => {
+            if (cancelled || !changed) return;
+            const refreshed = { ...stored };
+            setData(refreshed);
+            void persistData(refreshed);
+          })
+          .catch((err) => {
+            if (err instanceof DOMException && err.name === "AbortError") return;
+            console.warn("Username refresh on load failed:", err);
+          });
       })
       .finally(() => {
         if (!cancelled) setHydrating(false);
       });
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, []);
 
