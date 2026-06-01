@@ -90,41 +90,128 @@ class DiscordAuthError extends Error {}
 const discordSleep = (ms: number): Promise<void> =>
   new Promise((r) => setTimeout(r, ms));
 
-// These must mirror the production handler in api/discord-user.ts — see the
-// rationale for each value there.
-const DISCORD_CONCURRENCY = 4;
+// These mirror the production handler in api/discord-user.ts — keep the two in
+// sync, and see that file for the rationale behind each value.
+const DISCORD_CONCURRENCY = 2;
+const DISCORD_BUCKET_SAFETY_MARGIN = DISCORD_CONCURRENCY - 1;
 const DISCORD_MAX_RETRY_AFTER_SEC = 5;
 const DISCORD_DEADLINE_MS = 10_000;
+const DISCORD_MAX_RATE_LIMIT_HITS = 4;
+const DISCORD_MAX_ATTEMPTS_PER_ID = 2;
+const DISCORD_JITTER_MS = 250;
+
+interface DiscordUser {
+  username: string;
+  global_name: string | null;
+  avatar: string | null;
+}
+
+type DiscordOutcome =
+  | { kind: "ok"; user: DiscordUser }
+  | { kind: "absent" }
+  | { kind: "unavailable" };
 
 interface DiscordGate {
   pauseUntil: number;
   deadline: number;
+  stop: boolean;
+  rateLimitHits: number;
+  retryAfterSec: number;
 }
 
 function discordUserApiPlugin(token: string | undefined): Plugin {
   const API = "https://discord.com/api/v10";
 
-  async function fetchUser(id: string, gate: DiscordGate) {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const wait = gate.pauseUntil - Date.now();
+  // All `/users/:id` calls share one rate-limit bucket; after a success, pause
+  // the whole pool before the bucket is drained so the next call never 429s.
+  function applyBucketHeadroom(res: Response, gate: DiscordGate): void {
+    const remaining = Number(res.headers.get("x-ratelimit-remaining"));
+    const resetAfter = Number(res.headers.get("x-ratelimit-reset-after"));
+    if (!Number.isFinite(remaining) || !Number.isFinite(resetAfter)) return;
+    if (resetAfter <= 0) return;
+    if (remaining <= DISCORD_BUCKET_SAFETY_MARGIN) {
+      const resumeAt =
+        Date.now() + resetAfter * 1000 + Math.random() * DISCORD_JITTER_MS;
+      gate.pauseUntil = Math.max(gate.pauseUntil, resumeAt);
+    }
+  }
+
+  async function handleRateLimit(
+    res: Response,
+    gate: DiscordGate,
+  ): Promise<"retry" | "giveup"> {
+    const scope = res.headers.get("x-ratelimit-scope");
+    // `Retry-After` header and `retry_after` body are both in SECONDS (decimals
+    // allowed). Prefer the body for its sub-second precision.
+    const headerRetry = Number(res.headers.get("retry-after"));
+    let bodyRetry = NaN;
+    let bodyGlobal = false;
+    try {
+      const parsed = (await res.json()) as {
+        retry_after?: number;
+        global?: boolean;
+      };
+      if (typeof parsed.retry_after === "number") bodyRetry = parsed.retry_after;
+      if (typeof parsed.global === "boolean") bodyGlobal = parsed.global;
+    } catch {
+      /* non-JSON body → fall back to the header */
+    }
+    const waitSec =
+      Number.isFinite(bodyRetry) && bodyRetry > 0
+        ? bodyRetry
+        : Number.isFinite(headerRetry) && headerRetry > 0
+          ? headerRetry
+          : 1;
+    gate.retryAfterSec = Math.max(gate.retryAfterSec, Math.ceil(waitSec));
+
+    const global =
+      res.headers.get("x-ratelimit-global") === "true" ||
+      scope === "global" ||
+      bodyGlobal;
+
+    // `shared`-scope limits don't count toward Discord's Cloudflare ban budget.
+    if (scope !== "shared") gate.rateLimitHits += 1;
+
+    const resumeAt =
+      Date.now() + waitSec * 1000 + Math.random() * DISCORD_JITTER_MS;
+    gate.pauseUntil = Math.max(gate.pauseUntil, resumeAt);
+
+    if (
+      global ||
+      waitSec > DISCORD_MAX_RETRY_AFTER_SEC ||
+      resumeAt >= gate.deadline ||
+      gate.rateLimitHits >= DISCORD_MAX_RATE_LIMIT_HITS
+    ) {
+      gate.stop = true;
+      return "giveup";
+    }
+    return "retry";
+  }
+
+  async function fetchUser(
+    id: string,
+    gate: DiscordGate,
+  ): Promise<DiscordOutcome> {
+    for (let attempt = 0; attempt < DISCORD_MAX_ATTEMPTS_PER_ID; attempt++) {
+      if (gate.stop) return { kind: "unavailable" };
+
+      const now = Date.now();
+      if (now >= gate.deadline) return { kind: "unavailable" };
+
+      const wait = gate.pauseUntil - now;
       if (wait > 0) {
-        if (Date.now() + wait >= gate.deadline) return null;
+        if (now + wait >= gate.deadline) return { kind: "unavailable" };
         await discordSleep(wait);
+        if (gate.stop) return { kind: "unavailable" };
       }
-      if (Date.now() >= gate.deadline) return null;
 
       const res = await fetch(`${API}/users/${id}`, {
         headers: { Authorization: `Bot ${token}` },
       });
+
       if (res.status === 429) {
-        const retry = Number(res.headers.get("retry-after")) || 1;
-        if (retry > DISCORD_MAX_RETRY_AFTER_SEC) return null;
-        const resumeAt = Date.now() + retry * 1000 + Math.random() * 250;
-        if (res.headers.get("x-ratelimit-scope") === "global") {
-          gate.pauseUntil = Math.max(gate.pauseUntil, resumeAt);
-        }
-        if (resumeAt >= gate.deadline) return null;
-        await discordSleep(resumeAt - Date.now());
+        const verdict = await handleRateLimit(res, gate);
+        if (verdict === "giveup") return { kind: "unavailable" };
         continue;
       }
       if (res.status === 401 || res.status === 403) {
@@ -134,29 +221,22 @@ function discordUserApiPlugin(token: string | undefined): Plugin {
             `not the OAuth2 client secret.`,
         );
       }
-      if (res.status === 404) return null;
-      if (!res.ok) throw new Error(`Discord API ${res.status}`);
-      if (res.headers.get("x-ratelimit-remaining") === "0") {
-        const resetAfter = Number(res.headers.get("x-ratelimit-reset-after"));
-        if (resetAfter > 0) {
-          gate.pauseUntil = Math.max(
-            gate.pauseUntil,
-            Date.now() + resetAfter * 1000,
-          );
-        }
-      }
-      const u = (await res.json()) as {
-        username?: string;
-        global_name?: string | null;
-        avatar?: string | null;
-      };
+      if (res.status === 404) return { kind: "absent" };
+      if (!res.ok) return { kind: "unavailable" };
+
+      applyBucketHeadroom(res, gate);
+
+      const u = (await res.json()) as Partial<DiscordUser>;
       return {
-        username: u.username ?? "Unknown",
-        global_name: u.global_name ?? null,
-        avatar: u.avatar ?? null,
+        kind: "ok",
+        user: {
+          username: u.username ?? "Unknown",
+          global_name: u.global_name ?? null,
+          avatar: u.avatar ?? null,
+        },
       };
     }
-    return null;
+    return { kind: "unavailable" };
   }
 
   return {
@@ -186,28 +266,35 @@ function discordUserApiPlugin(token: string | undefined): Plugin {
             res.end(JSON.stringify({ error: "no ids" }));
             return;
           }
-          const users: Record<string, unknown> = {};
+          const users: Record<string, DiscordUser | null> = {};
           let authError: DiscordAuthError | null = null;
           const gate: DiscordGate = {
             pauseUntil: 0,
             deadline: Date.now() + DISCORD_DEADLINE_MS,
+            stop: false,
+            rateLimitHits: 0,
+            retryAfterSec: 0,
           };
           let cursor = 0;
           const worker = async () => {
             while (
               cursor < ids.length &&
               !authError &&
+              !gate.stop &&
               Date.now() < gate.deadline
             ) {
               const id = ids[cursor++];
               try {
-                users[id] = await fetchUser(id, gate);
+                const outcome = await fetchUser(id, gate);
+                if (outcome.kind === "ok") users[id] = outcome.user;
+                else if (outcome.kind === "absent") users[id] = null;
+                // "unavailable" → leave out so the client retries it later
               } catch (e) {
                 if (e instanceof DiscordAuthError) {
                   authError = e;
                   return;
                 }
-                users[id] = null;
+                /* swallow per-id transport errors; id stays unresolved */
               }
             }
           };
@@ -226,7 +313,12 @@ function discordUserApiPlugin(token: string | undefined): Plugin {
             return;
           }
           res.statusCode = 200;
-          res.end(JSON.stringify({ users }));
+          const payload: {
+            users: Record<string, DiscordUser | null>;
+            retryAfterSec?: number;
+          } = { users };
+          if (gate.retryAfterSec > 0) payload.retryAfterSec = gate.retryAfterSec;
+          res.end(JSON.stringify(payload));
         })();
       });
     },

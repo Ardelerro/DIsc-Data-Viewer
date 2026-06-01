@@ -10,8 +10,14 @@ const API = "https://discord.com/api/v10";
 
 
 
-
 const CONCURRENCY = 2;
+
+
+
+
+
+
+const BUCKET_SAFETY_MARGIN = CONCURRENCY - 1;
 
 
 
@@ -19,10 +25,7 @@ const DEADLINE_MS = 10_000;
 
 
 
-
-
-
-const HARD_BACKOFF_SEC = 5;
+const MAX_RETRY_AFTER_SEC = 5;
 
 
 
@@ -30,15 +33,19 @@ const HARD_BACKOFF_SEC = 5;
 const MAX_RATE_LIMIT_HITS = 4;
 
 
+
+const MAX_ATTEMPTS_PER_ID = 2;
+
+
+
+const JITTER_MS = 250;
+
 export const maxDuration = 15;
 
 class DiscordAuthError extends Error {}
 
 const sleep = (ms: number): Promise<void> =>
   new Promise((r) => setTimeout(r, ms));
-
-
-
 
 type Outcome =
   | { kind: "ok"; user: DiscordUser }
@@ -48,14 +55,13 @@ type Outcome =
 const ABSENT: Outcome = { kind: "absent" };
 const UNAVAILABLE: Outcome = { kind: "unavailable" };
 
+
+
 interface Gate {
   
   pauseUntil: number;
   
   deadline: number;
-  
-  
-  
   
   stop: boolean;
   
@@ -65,19 +71,106 @@ interface Gate {
   retryAfterSec: number;
 }
 
-
-
-
 function logRateLimit(res: Response, id: string, body: string): void {
   console.warn(
     `[discord-user] 429 id=${id} ` +
       `scope=${res.headers.get("x-ratelimit-scope")} ` +
       `global=${res.headers.get("x-ratelimit-global")} ` +
       `retry-after=${res.headers.get("retry-after")} ` +
+      `bucket=${res.headers.get("x-ratelimit-bucket")} ` +
       `cf-ray=${res.headers.get("cf-ray")} ` +
       `server=${res.headers.get("server")} ` +
       `body=${body.slice(0, 160).replace(/\s+/g, " ")}`,
   );
+}
+
+
+
+
+
+function applyBucketHeadroom(res: Response, gate: Gate): void {
+  const remaining = Number(res.headers.get("x-ratelimit-remaining"));
+  const resetAfter = Number(res.headers.get("x-ratelimit-reset-after"));
+  if (!Number.isFinite(remaining) || !Number.isFinite(resetAfter)) return;
+  if (resetAfter <= 0) return;
+  if (remaining <= BUCKET_SAFETY_MARGIN) {
+    const resumeAt = Date.now() + resetAfter * 1000 + Math.random() * JITTER_MS;
+    gate.pauseUntil = Math.max(gate.pauseUntil, resumeAt);
+  }
+}
+
+
+
+async function handleRateLimit(
+  res: Response,
+  id: string,
+  gate: Gate,
+): Promise<"retry" | "giveup"> {
+  const scope = res.headers.get("x-ratelimit-scope"); 
+  
+  
+  const headerRetry = Number(res.headers.get("retry-after"));
+
+  let bodyText = "";
+  try {
+    bodyText = await res.text();
+  } catch {
+    /* ignore */
+  }
+  let bodyRetry = NaN;
+  let bodyGlobal = false;
+  try {
+    const parsed = JSON.parse(bodyText) as {
+      retry_after?: number;
+      global?: boolean;
+    };
+    if (typeof parsed.retry_after === "number") bodyRetry = parsed.retry_after;
+    if (typeof parsed.global === "boolean") bodyGlobal = parsed.global;
+  } catch {
+    /* non-JSON body (e.g. a Cloudflare block) → fall back to header below */
+  }
+  logRateLimit(res, id, bodyText);
+
+  const waitSec =
+    Number.isFinite(bodyRetry) && bodyRetry > 0
+      ? bodyRetry
+      : Number.isFinite(headerRetry) && headerRetry > 0
+        ? headerRetry
+        : 1;
+  gate.retryAfterSec = Math.max(gate.retryAfterSec, Math.ceil(waitSec));
+
+  
+  
+  
+  const global =
+    res.headers.get("x-ratelimit-global") === "true" ||
+    scope === "global" ||
+    bodyGlobal;
+
+  
+  
+  
+  if (scope !== "shared") gate.rateLimitHits += 1;
+
+  const resumeAt = Date.now() + waitSec * 1000 + Math.random() * JITTER_MS;
+  
+  
+  gate.pauseUntil = Math.max(gate.pauseUntil, resumeAt);
+
+  
+  
+  
+  
+  if (
+    global ||
+    waitSec > MAX_RETRY_AFTER_SEC ||
+    resumeAt >= gate.deadline ||
+    gate.rateLimitHits >= MAX_RATE_LIMIT_HITS
+  ) {
+    gate.stop = true;
+    return "giveup";
+  }
+  return "retry";
 }
 
 async function fetchUser(
@@ -85,93 +178,50 @@ async function fetchUser(
   token: string,
   gate: Gate,
 ): Promise<Outcome> {
-  if (gate.stop || Date.now() >= gate.deadline) return UNAVAILABLE;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS_PER_ID; attempt++) {
+    if (gate.stop) return UNAVAILABLE;
 
-  
-  const wait = gate.pauseUntil - Date.now();
-  if (wait > 0) {
-    if (Date.now() + wait >= gate.deadline) return UNAVAILABLE;
-    await sleep(wait);
+    const now = Date.now();
+    if (now >= gate.deadline) return UNAVAILABLE;
+
+    
+    const wait = gate.pauseUntil - now;
+    if (wait > 0) {
+      if (now + wait >= gate.deadline) return UNAVAILABLE;
+      await sleep(wait);
+      if (gate.stop) return UNAVAILABLE;
+    }
+
+    const res = await fetch(`${API}/users/${id}`, {
+      headers: { Authorization: `Bot ${token}` },
+    });
+
+    if (res.status === 429) {
+      const verdict = await handleRateLimit(res, id, gate);
+      if (verdict === "giveup") return UNAVAILABLE;
+      continue; 
+    }
+    if (res.status === 401 || res.status === 403) {
+      throw new DiscordAuthError(
+        `Discord rejected the bot token (${res.status}).`,
+      );
+    }
+    if (res.status === 404) return ABSENT;
+    if (!res.ok) return UNAVAILABLE;
+
+    applyBucketHeadroom(res, gate);
+
+    const u = (await res.json()) as Partial<DiscordUser>;
+    return {
+      kind: "ok",
+      user: {
+        username: u.username ?? "Unknown",
+        global_name: u.global_name ?? null,
+        avatar: u.avatar ?? null,
+      },
+    };
   }
-  if (gate.stop) return UNAVAILABLE;
-
-  const res = await fetch(`${API}/users/${id}`, {
-    headers: { Authorization: `Bot ${token}` },
-  });
-
-  if (res.status === 429) {
-    const scope = res.headers.get("x-ratelimit-scope");
-    const headerRetry = Number(res.headers.get("retry-after")) || 0;
-
-    
-    
-    let bodyText = "";
-    try {
-      bodyText = await res.text();
-    } catch {
-      /* ignore */
-    }
-    let bodyRetry = 0;
-    try {
-      const parsed = JSON.parse(bodyText) as { retry_after?: number };
-      if (typeof parsed.retry_after === "number") bodyRetry = parsed.retry_after;
-    } catch {
-      /* non-JSON → treat as a hard block below */
-    }
-    logRateLimit(res, id, bodyText);
-
-    const waitSec = bodyRetry || headerRetry || 1;
-    
-    
-    if (
-      !scope ||
-      waitSec >= HARD_BACKOFF_SEC ||
-      gate.rateLimitHits >= MAX_RATE_LIMIT_HITS
-    ) {
-      gate.retryAfterSec = Math.max(gate.retryAfterSec, Math.ceil(waitSec));
-      gate.stop = true;
-      return UNAVAILABLE;
-    }
-
-    
-    
-    
-    
-    gate.rateLimitHits += 1;
-    gate.retryAfterSec = Math.max(gate.retryAfterSec, Math.ceil(waitSec));
-    const pauseUntil = Date.now() + waitSec * 1000;
-    if (pauseUntil < gate.deadline) {
-      gate.pauseUntil = Math.max(gate.pauseUntil, pauseUntil);
-    }
-    
-    
-    return UNAVAILABLE;
-  }
-  if (res.status === 401 || res.status === 403) {
-    throw new DiscordAuthError(`Discord rejected the bot token (${res.status}).`);
-  }
-  if (res.status === 404) return ABSENT;
-  if (!res.ok) return UNAVAILABLE;
-
-  
-  
-  
-  if (res.headers.get("x-ratelimit-remaining") === "0") {
-    const resetAfter = Number(res.headers.get("x-ratelimit-reset-after"));
-    if (resetAfter > 0) {
-      gate.pauseUntil = Math.max(gate.pauseUntil, Date.now() + resetAfter * 1000);
-    }
-  }
-
-  const u = (await res.json()) as Partial<DiscordUser>;
-  return {
-    kind: "ok",
-    user: {
-      username: u.username ?? "Unknown",
-      global_name: u.global_name ?? null,
-      avatar: u.avatar ?? null,
-    },
-  };
+  return UNAVAILABLE;
 }
 
 export default async function handler(
@@ -201,9 +251,6 @@ export default async function handler(
     return;
   }
 
-  
-  
-  
   const users: Record<string, DiscordUser | null> = {};
   let authError: DiscordAuthError | null = null;
   const gate: Gate = {
@@ -233,7 +280,7 @@ export default async function handler(
           authError = e;
           return;
         }
-        
+        /* swallow per-id transport errors; the id stays unresolved */
       }
     }
   }
