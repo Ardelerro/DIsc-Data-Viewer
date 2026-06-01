@@ -145,16 +145,6 @@ export const DataProvider: FC<{ children: React.ReactNode }> = ({
           })
         : Promise.resolve(null);
 
-      setActivityProgress(0);
-      const activityPromise = processActivities(
-        file,
-        (p) => setActivityProgress(p),
-        signal,
-        prof,
-      );
-
-      activityPromise.catch(() => {});
-
       const stopModelWait = prof.start("orchestrator:modelReadyWait");
       const aiMode = useAI ? await modelReady : false;
       stopModelWait();
@@ -199,6 +189,14 @@ export const DataProvider: FC<{ children: React.ReactNode }> = ({
       onProgress?.(100, "Complete!");
 
       stopPerceived();
+
+      setActivityProgress(0);
+      const activityPromise = processActivities(
+        file,
+        (p) => setActivityProgress(p),
+        signal,
+        prof,
+      );
 
       const finalizeProfile = () => {
         stopTotal();
