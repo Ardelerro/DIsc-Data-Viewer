@@ -303,12 +303,6 @@ const Home: FC = () => {
           {showElements.moodChart && (
             <HourlyMoodChart className="col-span-1 lg:col-span-2" />
           )}
-          {showElements.hourlyCharts && (
-            <HourlyChart
-              data={filteredHourly}
-              className="col-span-1 lg:col-span-2"
-            />
-          )}
           <div className="col-span-1 lg:col-span-2 flex flex-wrap items-center gap-3 px-0.5 mt-2">
             <TimeRangeSelector
               hasDaily={hasDaily}
@@ -316,6 +310,12 @@ const Home: FC = () => {
               onChange={setDateRange}
             />
           </div>
+          {showElements.hourlyCharts && (
+            <HourlyChart
+              data={filteredHourly}
+              className="col-span-1 lg:col-span-2"
+            />
+          )}
           {showElements.monthlyCharts && (
             <MonthlyChart
               data={filteredMonthly}
