@@ -87,17 +87,44 @@ function designTokensPlugin(): Plugin {
 
 class DiscordAuthError extends Error {}
 
+const discordSleep = (ms: number): Promise<void> =>
+  new Promise((r) => setTimeout(r, ms));
+
+// These must mirror the production handler in api/discord-user.ts — see the
+// rationale for each value there.
+const DISCORD_CONCURRENCY = 4;
+const DISCORD_MAX_RETRY_AFTER_SEC = 5;
+const DISCORD_DEADLINE_MS = 10_000;
+
+interface DiscordGate {
+  pauseUntil: number;
+  deadline: number;
+}
+
 function discordUserApiPlugin(token: string | undefined): Plugin {
   const API = "https://discord.com/api/v10";
 
-  async function fetchUser(id: string) {
+  async function fetchUser(id: string, gate: DiscordGate) {
     for (let attempt = 0; attempt < 3; attempt++) {
+      const wait = gate.pauseUntil - Date.now();
+      if (wait > 0) {
+        if (Date.now() + wait >= gate.deadline) return null;
+        await discordSleep(wait);
+      }
+      if (Date.now() >= gate.deadline) return null;
+
       const res = await fetch(`${API}/users/${id}`, {
         headers: { Authorization: `Bot ${token}` },
       });
       if (res.status === 429) {
         const retry = Number(res.headers.get("retry-after")) || 1;
-        await new Promise((r) => setTimeout(r, retry * 1000));
+        if (retry > DISCORD_MAX_RETRY_AFTER_SEC) return null;
+        const resumeAt = Date.now() + retry * 1000 + Math.random() * 250;
+        if (res.headers.get("x-ratelimit-scope") === "global") {
+          gate.pauseUntil = Math.max(gate.pauseUntil, resumeAt);
+        }
+        if (resumeAt >= gate.deadline) return null;
+        await discordSleep(resumeAt - Date.now());
         continue;
       }
       if (res.status === 401 || res.status === 403) {
@@ -109,6 +136,15 @@ function discordUserApiPlugin(token: string | undefined): Plugin {
       }
       if (res.status === 404) return null;
       if (!res.ok) throw new Error(`Discord API ${res.status}`);
+      if (res.headers.get("x-ratelimit-remaining") === "0") {
+        const resetAfter = Number(res.headers.get("x-ratelimit-reset-after"));
+        if (resetAfter > 0) {
+          gate.pauseUntil = Math.max(
+            gate.pauseUntil,
+            Date.now() + resetAfter * 1000,
+          );
+        }
+      }
       const u = (await res.json()) as {
         username?: string;
         global_name?: string | null;
@@ -120,7 +156,7 @@ function discordUserApiPlugin(token: string | undefined): Plugin {
         avatar: u.avatar ?? null,
       };
     }
-    throw new Error("Discord API rate limited");
+    return null;
   }
 
   return {
@@ -152,12 +188,20 @@ function discordUserApiPlugin(token: string | undefined): Plugin {
           }
           const users: Record<string, unknown> = {};
           let authError: DiscordAuthError | null = null;
+          const gate: DiscordGate = {
+            pauseUntil: 0,
+            deadline: Date.now() + DISCORD_DEADLINE_MS,
+          };
           let cursor = 0;
           const worker = async () => {
-            while (cursor < ids.length && !authError) {
+            while (
+              cursor < ids.length &&
+              !authError &&
+              Date.now() < gate.deadline
+            ) {
               const id = ids[cursor++];
               try {
-                users[id] = await fetchUser(id);
+                users[id] = await fetchUser(id, gate);
               } catch (e) {
                 if (e instanceof DiscordAuthError) {
                   authError = e;
@@ -169,7 +213,9 @@ function discordUserApiPlugin(token: string | undefined): Plugin {
           };
           try {
             await Promise.all(
-              Array.from({ length: Math.min(10, ids.length) }, () => worker()),
+              Array.from({ length: Math.min(DISCORD_CONCURRENCY, ids.length) },
+                () => worker(),
+              ),
             );
             if (authError) throw authError;
           } catch (e) {
