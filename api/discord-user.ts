@@ -6,6 +6,8 @@ interface DiscordUser {
 
 const API = "https://discord.com/api/v10";
 
+const CONCURRENCY = 10;
+
 class DiscordAuthError extends Error {}
 
 async function fetchUser(
@@ -66,15 +68,29 @@ export default async function handler(
   }
 
   const users: Record<string, DiscordUser | null> = {};
-  try {
-    for (const id of ids) {
+  let authError: DiscordAuthError | null = null;
+
+  let cursor = 0;
+  async function worker(): Promise<void> {
+    while (cursor < ids.length && !authError) {
+      const id = ids[cursor++];
       try {
         users[id] = await fetchUser(id, token);
       } catch (e) {
-        if (e instanceof DiscordAuthError) throw e;
+        if (e instanceof DiscordAuthError) {
+          authError = e;
+          return;
+        }
         users[id] = null;
       }
     }
+  }
+
+  try {
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, ids.length) }, () => worker()),
+    );
+    if (authError) throw authError;
     res.setHeader("Cache-Control", "no-store");
     res.status(200).json({ users });
   } catch (e) {

@@ -18,7 +18,6 @@ function designTokensPlugin(): Plugin {
   const designPath = resolve(__dirname, "src/config/design.cjs");
   const outputPath = resolve(__dirname, "src/config/generated-tokens.css");
 
-  // camelCase + digit-suffix → kebab-case (e.g. surfaceRaised→surface-raised, text1→text-1)
   function toKebab(key: string): string {
     return key
       .replace(/([A-Z])/g, "-$1")
@@ -86,10 +85,6 @@ function designTokensPlugin(): Plugin {
   };
 }
 
-// Dev-only mirror of api/discord-user.ts (the Vercel function). Vite doesn't run
-// serverless functions, so this middleware serves the same /api/discord-user
-// route during `npm run dev`, reading DISCORD_BOT_TOKEN from .env. Keep the two
-// in sync. The token stays on the Node side and never enters the client bundle.
 class DiscordAuthError extends Error {}
 
 function discordUserApiPlugin(token: string | undefined): Plugin {
@@ -156,15 +151,27 @@ function discordUserApiPlugin(token: string | undefined): Plugin {
             return;
           }
           const users: Record<string, unknown> = {};
-          try {
-            for (const id of ids) {
+          let authError: DiscordAuthError | null = null;
+          let cursor = 0;
+          const worker = async () => {
+            while (cursor < ids.length && !authError) {
+              const id = ids[cursor++];
               try {
                 users[id] = await fetchUser(id);
               } catch (e) {
-                if (e instanceof DiscordAuthError) throw e;
+                if (e instanceof DiscordAuthError) {
+                  authError = e;
+                  return;
+                }
                 users[id] = null;
               }
             }
+          };
+          try {
+            await Promise.all(
+              Array.from({ length: Math.min(10, ids.length) }, () => worker()),
+            );
+            if (authError) throw authError;
           } catch (e) {
             const msg = e instanceof Error ? e.message : "fetch failed";
             console.error("[discord-user]", msg);
