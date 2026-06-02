@@ -33,7 +33,7 @@ interface Props {
 }
 
 const ASPECT = CARD_H / CARD_W;
-const DOWNLOAD_PIXEL_RATIO = 2; // 1080×1920 → 2160×3840 (true 4K vertical)
+const DOWNLOAD_PIXEL_RATIO = 2;
 
 const raf2 = () =>
   new Promise<void>((resolve) =>
@@ -105,8 +105,6 @@ export default function WrappedCarousel({ data, onClose }: Props) {
   }, []);
 
   const isMobile = viewport.w < 768;
-  // Reserve vertical room for the header, dots, label and action buttons so the
-  // card always fits and the centred layout never clips out of reach.
   const chromeH = isMobile ? 230 : 300;
   const availH = Math.max(300, viewport.h - chromeH);
   const availW = isMobile ? viewport.w - 40 : Math.min(420, viewport.w * 0.7);

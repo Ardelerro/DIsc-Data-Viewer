@@ -36,6 +36,7 @@ async function processZipData(
   signal?: AbortSignal,
   aiMode = false,
   prof: Profiler = new Profiler(),
+  onEnriched?: () => void,
 ): Promise<Omit<ProcessedData, "activityStats">> {
   const zp = new Profiler();
   const reader = new ZipReader(new BlobReader(file));
@@ -135,15 +136,14 @@ async function processZipData(
       recipientIds.push(r);
     }
   }
+  let flushNames: () => void = () => {};
   const enrichPromise = enrichUserMapping(
     self,
     userMapping,
     recipientIds,
     signal,
-  ).catch((err: unknown) => {
-    if (err instanceof DOMException && err.name === "AbortError") return err;
-    return null;
-  });
+    () => flushNames(),
+  );
 
   await reader.close();
   if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
@@ -271,12 +271,6 @@ async function processZipData(
     stopPool();
   }
 
-  const enrichErr = await zp.timeAsync(
-    "enrichUsers:await",
-    () => enrichPromise,
-  );
-  if (enrichErr) throw enrichErr;
-
   const stopFinalize = zp.start("finalize(naming+topWords)");
 
   const dmManifest: string[] = [];
@@ -306,7 +300,19 @@ async function processZipData(
     }
   }
 
-  applyDmRecipientNames(channelStats, dmManifest, userMapping);
+  flushNames = () => {
+    applyDmRecipientNames(channelStats, dmManifest, userMapping);
+    onEnriched?.();
+  };
+  flushNames();
+
+  void enrichPromise.catch((err: unknown) => {
+    if (err instanceof DOMException && err.name === "AbortError") return;
+    console.warn(
+      "Background user enrichment failed; keeping current names:",
+      err,
+    );
+  });
 
   if (Object.keys(globalWordFreq).length > 5000) {
     for (const k in globalWordFreq) {
@@ -414,6 +420,7 @@ function namesSignature(data: ProcessedData): string {
 async function refreshUserNames(
   data: ProcessedData,
   signal?: AbortSignal,
+  onUpdate?: () => void,
 ): Promise<boolean> {
   const before = namesSignature(data);
 
@@ -440,7 +447,16 @@ async function refreshUserNames(
   byActivity.sort((a, b) => b.count - a.count);
   const recipientIds = byActivity.map((e) => e.id);
 
-  await enrichUserMapping(data.self, data.userMapping, recipientIds, signal);
+  await enrichUserMapping(
+    data.self,
+    data.userMapping,
+    recipientIds,
+    signal,
+    () => {
+      applyDmRecipientNames(data.channelStats, data.dmManifest, data.userMapping);
+      onUpdate?.();
+    },
+  );
   applyDmRecipientNames(data.channelStats, data.dmManifest, data.userMapping);
 
   return namesSignature(data) !== before;

@@ -10,11 +10,33 @@ const TTL_MS = 1000 * 60 * 60 * 24 * 7;
 
 
 
-const TRANSIENT_TTL_MS = 1000 * 60 * 10;
+const TRANSIENT_TTL_MS = 10 * 60 * 10;
 
 const BATCH = 50;
 
 const memCache = new Map<string, CachedDiscordUser>();
+const MAX_EMPTY_ROUNDS = 6;
+const BASE_BACKOFF_SEC = 1;
+const MAX_BACKOFF_SEC = 30;
+const JITTER_MS = 250;
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new DOMException("Aborted", "AbortError"));
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
 
 interface ApiUser {
   username: string;
@@ -68,94 +90,17 @@ function displayName(u: {
 export async function enrichUserMapping(
   self: Self,
   userMapping: Record<string, { username: string; avatar: string }>,
-  
-  
-  
-  
-  
   ids: string[],
   signal?: AbortSignal,
+  onProgress?: () => void,
 ): Promise<void> {
   const wanted = new Set<string>();
   if (self?.id) wanted.add(self.id);
   for (const id of ids) if (id && id !== "unknown") wanted.add(id);
   if (wanted.size === 0) return;
 
-  const now = Date.now();
-  const resolved = new Map<string, CachedDiscordUser>();
-  const toFetch: string[] = [];
-
-  const persisted = await getCachedUsers([...wanted]);
-  for (const id of wanted) {
-    const hit = memCache.get(id) ?? persisted[id];
-    if (hit && now - hit.fetchedAt < ttlFor(hit)) {
-      resolved.set(id, hit);
-      memCache.set(id, hit);
-    } else {
-      toFetch.push(id);
-    }
-  }
-
-  const fresh: Record<string, CachedDiscordUser> = {};
-  for (let i = 0; i < toFetch.length; i += BATCH) {
-    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
-    const batch = toFetch.slice(i, i + BATCH);
-    let result: BatchResult;
-    try {
-      result = await fetchBatch(batch, signal);
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") throw err;
-
-      console.warn("Discord user enrichment failed; using export values:", err);
-      break;
-    }
-    const { users, retryAfterSec } = result;
-    for (const id of batch) {
-      const u = users[id];
-      if (u && u.username) {
-        const entry: CachedDiscordUser = {
-          username: u.username,
-          global_name: u.global_name,
-          avatar: u.avatar,
-          fetchedAt: now,
-        };
-        resolved.set(id, entry);
-        memCache.set(id, entry);
-        fresh[id] = entry;
-      } else {
-        
-        
-        const entry: CachedDiscordUser = {
-          username: "",
-          global_name: null,
-          avatar: null,
-          fetchedAt: now,
-          transient: !(id in users),
-        };
-        memCache.set(id, entry);
-        fresh[id] = entry;
-      }
-    }
-    
-    
-    
-    
-    
-    if (retryAfterSec) {
-      const remaining = toFetch.length - (i + batch.length);
-      console.warn(
-        `[discord-user] rate-limited by Discord (retry-after ~${retryAfterSec}s); ` +
-          `stopping enrichment for this session — ${remaining} user(s) left ` +
-          `unresolved keep export names and retry after ~${TRANSIENT_TTL_MS / 60000}min.`,
-      );
-      break;
-    }
-  }
-
-  void putCachedUsers(fresh);
-
-  for (const [id, u] of resolved) {
-    if (!u.username) continue;
+  const apply = (id: string, u: CachedDiscordUser): void => {
+    if (!u.username) return;
     if (id === self.id) {
       self.username = displayName(u);
       if (u.avatar) self.avatar_hash = u.avatar;
@@ -166,5 +111,93 @@ export async function enrichUserMapping(
     } else {
       userMapping[id] = { username: displayName(u), avatar: u.avatar ?? "" };
     }
+  };
+
+  const persisted = await getCachedUsers([...wanted]);
+  const queue: string[] = [];
+  const cacheNow = Date.now();
+  let appliedFromCache = false;
+  for (const id of wanted) {
+    const hit = memCache.get(id) ?? persisted[id];
+    if (hit && cacheNow - hit.fetchedAt < ttlFor(hit)) {
+      memCache.set(id, hit);
+      if (hit.username) {
+        apply(id, hit);
+        appliedFromCache = true;
+      }
+    } else {
+      queue.push(id);
+    }
+  }
+  if (appliedFromCache) onProgress?.();
+
+  let emptyRounds = 0;
+  while (queue.length > 0) {
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    const batch = queue.splice(0, BATCH);
+
+    let result: BatchResult;
+    try {
+      result = await fetchBatch(batch, signal);
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") throw err;
+      console.warn("Discord user enrichment failed; using export values:", err);
+      break;
+    }
+
+    const { users, retryAfterSec } = result;
+    const now = Date.now();
+    const fresh: Record<string, CachedDiscordUser> = {};
+    let appliedThisBatch = false;
+    for (const id of batch) {
+      const u = users[id];
+      if (u && u.username) {
+        const entry: CachedDiscordUser = {
+          username: u.username,
+          global_name: u.global_name,
+          avatar: u.avatar,
+          fetchedAt: now,
+        };
+        memCache.set(id, entry);
+        fresh[id] = entry;
+        apply(id, entry);
+        appliedThisBatch = true;
+      } else if (id in users) {
+        const entry: CachedDiscordUser = {
+          username: "",
+          global_name: null,
+          avatar: null,
+          fetchedAt: now,
+        };
+        memCache.set(id, entry);
+        fresh[id] = entry;
+      } else {
+        queue.push(id);
+      }
+    }
+    if (Object.keys(fresh).length > 0) void putCachedUsers(fresh);
+    if (appliedThisBatch) onProgress?.();
+
+    if (!retryAfterSec) {
+      emptyRounds = 0; 
+      continue;
+    }
+
+    if (appliedThisBatch) {
+      emptyRounds = 0;
+    } else if (++emptyRounds > MAX_EMPTY_ROUNDS) {
+      console.warn(
+        `[discord-user] rate limit hasn't eased after ${MAX_EMPTY_ROUNDS} stuck ` +
+          `round(s); ${queue.length} user(s) left unresolved (keeping export ` +
+          `names) — they'll retry on the next load.`,
+      );
+      break;
+    }
+
+    const backoffSec = Math.min(
+      Math.max(retryAfterSec, BASE_BACKOFF_SEC) * 2 ** emptyRounds,
+      MAX_BACKOFF_SEC,
+    );
+    await sleep(backoffSec * 1000 + Math.random() * JITTER_MS, signal);
   }
 }

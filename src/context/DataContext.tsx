@@ -90,7 +90,10 @@ export const DataProvider: FC<{ children: React.ReactNode }> = ({
       .then((stored) => {
         if (cancelled || !stored) return;
         setData(stored);
-        refreshUserNames(stored, controller.signal)
+        const reRender = () => {
+          if (!cancelled) setData({ ...stored });
+        };
+        refreshUserNames(stored, controller.signal, reRender)
           .then((changed) => {
             if (cancelled || !changed) return;
             const refreshed = { ...stored };
@@ -163,6 +166,17 @@ export const DataProvider: FC<{ children: React.ReactNode }> = ({
       const aiMode = useAI ? await modelReady : false;
       stopModelWait();
 
+      let current: ProcessedData | null = null;
+      let persistTimer: ReturnType<typeof setTimeout> | undefined;
+      const onEnriched = () => {
+        if (!current) return;
+        current = { ...current };
+        setData(current);
+        const snapshot = current;
+        clearTimeout(persistTimer);
+        persistTimer = setTimeout(() => void persistData(snapshot), 1500);
+      };
+
       const stopPromiseAll = prof.start("orchestrator:promiseAll");
       const [processed, sentimentResult] = await Promise.all([
         processZipData(
@@ -174,6 +188,7 @@ export const DataProvider: FC<{ children: React.ReactNode }> = ({
           signal,
           aiMode,
           prof,
+          onEnriched,
         ),
         sentimentPromise,
       ]);
@@ -188,6 +203,7 @@ export const DataProvider: FC<{ children: React.ReactNode }> = ({
       if (useAI && sentimentResult) {
         applySentiment(fullData, sentimentResult, options.sampleRate);
       }
+      current = fullData;
 
       onProgress?.(99, "Saving data...");
       setData(fullData);
@@ -234,14 +250,14 @@ export const DataProvider: FC<{ children: React.ReactNode }> = ({
       activityPromise
         .then(async (activityStats) => {
           setActivityProgress(null);
-          const patched: ProcessedData = {
-            ...fullData,
+          current = {
+            ...(current ?? fullData),
             activityStats,
             activityPending: false,
           };
-          setData(patched);
+          setData(current);
           try {
-            await persistData(patched);
+            await persistData(current);
           } catch (err) {
             console.error("Failed to persist activity stats:", err);
           }
@@ -254,7 +270,8 @@ export const DataProvider: FC<{ children: React.ReactNode }> = ({
             "Activity processing failed; counts left at zero:",
             err,
           );
-          setData({ ...fullData, activityPending: false });
+          current = { ...(current ?? fullData), activityPending: false };
+          setData(current);
           finalizeProfile();
         });
     } catch (err) {

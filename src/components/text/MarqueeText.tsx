@@ -56,9 +56,9 @@ const MarqueeText: FC<MarqueeTextProps> = ({
     const el = marqueeRef.current;
     if (!el) return;
 
-    el.style.animation = "none";
-    el.offsetHeight;
-    el.style.animation = `${keyframeName} ${MARQUEE_DURATION}s linear infinite`;
+    el.style.animationName = "none";
+    void el.offsetHeight;
+    el.style.animationName = keyframeName;
     el.style.animationPlayState = "paused";
   };
 
@@ -98,10 +98,10 @@ const MarqueeText: FC<MarqueeTextProps> = ({
               ref={marqueeRef}
               className={`inline-block whitespace-nowrap will-change-transform pointer-events-auto ${className}`}
               style={{
-                animation:
-                  rotation === "auto"
-                    ? `${keyframeName} ${MARQUEE_DURATION}s linear infinite`
-                    : `${keyframeName} ${MARQUEE_DURATION}s linear infinite`,
+                animationName: keyframeName,
+                animationDuration: `${MARQUEE_DURATION}s`,
+                animationTimingFunction: "linear",
+                animationIterationCount: "infinite",
                 animationPlayState: rotation === "hover" ? "paused" : "running",
               }}
               onMouseEnter={(e) => {
