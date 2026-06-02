@@ -1,64 +1,118 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { createPortal } from "react-dom";
-import { X, Download, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import {
-  previewAllCards,
-  downloadWrappedCard,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
+import { flushSync } from "react-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  X,
+  Download,
+  Share2,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+} from "lucide-react";
+import {
+  avatarToDataUrl,
+  captureNode,
+  downloadDataUrl,
+  FALLBACK_AVATAR,
+  CARD_W,
+  CARD_H,
 } from "../../utils/generateWrapped";
-import type { WrappedCardData } from "../../types/discord";
+import { deriveWrappedStats } from "../../utils/wrappedStats";
+import { enabledCards, type WrappedCardDef } from "../wrapped/WrappedCards";
+import type { ProcessedData } from "../../types/discord";
 
 interface Props {
-  data: WrappedCardData;
+  data: ProcessedData;
   onClose: () => void;
 }
 
-interface CardPreview {
-  id: string;
-  label: string;
-  bg: string;
-  dataUrl: string;
+const ASPECT = CARD_H / CARD_W;
+const DOWNLOAD_PIXEL_RATIO = 2; // 1080×1920 → 2160×3840 (true 4K vertical)
+
+const raf2 = () =>
+  new Promise<void>((resolve) =>
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+  );
+
+function ScaledCard({
+  def,
+  stats,
+  avatarUrl,
+  scale,
+}: {
+  def: WrappedCardDef;
+  stats: ReturnType<typeof deriveWrappedStats>;
+  avatarUrl: string;
+  scale: number;
+}) {
+  const Card = def.Component;
+  return (
+    <div
+      style={{
+        width: CARD_W,
+        height: CARD_H,
+        transform: `scale(${scale})`,
+        transformOrigin: "top left",
+      }}
+    >
+      <Card def={def} stats={stats} avatarUrl={avatarUrl} />
+    </div>
+  );
 }
 
-const CARD_DISPLAY_W = 400;
-const ASPECT = 1920 / 1080;
-
 export default function WrappedCarousel({ data, onClose }: Props) {
-  const [cards, setCards] = useState<CardPreview[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadProgress, setProgress] = useState(0);
+  const stats = useMemo(() => deriveWrappedStats(data), [data]);
+  const cards = useMemo(() => enabledCards(stats), [stats]);
+
   const [active, setActive] = useState(0);
-  const [downloading, setDownloading] = useState<string | null>(null);
   const [direction, setDirection] = useState(1);
+  const [busy, setBusy] = useState<null | "save" | "share" | "all">(null);
+  const [avatarUrl, setAvatarUrl] = useState(FALLBACK_AVATAR);
+  const [captureIdx, setCaptureIdx] = useState(0);
+  const [viewport, setViewport] = useState({
+    w: window.innerWidth,
+    h: window.innerHeight,
+  });
+
+  const avatarPromise = useRef<Promise<string> | null>(null);
+  const captureRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef<number | null>(null);
-  const isMobile = window.innerWidth < 768;
 
-  const cardW = isMobile
-    ? window.innerWidth - 32
-    : Math.min(CARD_DISPLAY_W, Math.round(window.innerWidth * 0.72));
-  const cardH = Math.round(cardW * ASPECT);
-
+  /* resolve the user's avatar once, inline it as a data URL for capture */
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setProgress(0);
-    previewAllCards(data).then((all) => {
-      if (!cancelled) {
-        setCards(all);
-        setLoading(false);
-        setProgress(100);
-      }
+    const p = avatarToDataUrl(stats.self.id, stats.self.avatarHash);
+    avatarPromise.current = p;
+    p.then((url) => {
+      if (!cancelled) setAvatarUrl(url);
     });
     return () => {
       cancelled = true;
     };
-  }, [data]);
+  }, [stats.self.id, stats.self.avatarHash]);
 
   useEffect(() => {
-    if (!loading) return;
-    const id = setInterval(() => setProgress((p) => Math.min(p + 4, 90)), 350);
-    return () => clearInterval(id);
-  }, [loading]);
+    const onResize = () =>
+      setViewport({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const isMobile = viewport.w < 768;
+  // Reserve vertical room for the header, dots, label and action buttons so the
+  // card always fits and the centred layout never clips out of reach.
+  const chromeH = isMobile ? 230 : 300;
+  const availH = Math.max(300, viewport.h - chromeH);
+  const availW = isMobile ? viewport.w - 40 : Math.min(420, viewport.w * 0.7);
+  const cardW = Math.max(180, Math.min(availW, availH / ASPECT));
+  const cardH = cardW * ASPECT;
+  const scale = cardW / CARD_W;
 
   const go = useCallback(
     (delta: number) => {
@@ -67,19 +121,6 @@ export default function WrappedCarousel({ data, onClose }: Props) {
       setActive((prev) => (prev + delta + cards.length) % cards.length);
     },
     [cards.length],
-  );
-
-  const handleDownload = useCallback(
-    async (id: string) => {
-      if (!id) return;
-      setDownloading(id);
-      try {
-        await downloadWrappedCard(data, id);
-      } finally {
-        setDownloading(null);
-      }
-    },
-    [data],
   );
 
   useEffect(() => {
@@ -92,337 +133,338 @@ export default function WrappedCarousel({ data, onClose }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [go, onClose]);
 
-  const slideVariants = {
-    enter: (d: number) => ({
-      x: d > 0 ? cardW + 48 : -(cardW + 48),
-      opacity: 0,
-      scale: 0.94,
-    }),
-    center: { x: 0, opacity: 1, scale: 1 },
-    exit: (d: number) => ({
-      x: d > 0 ? -(cardW + 48) : cardW + 48,
-      opacity: 0,
-      scale: 0.94,
-    }),
-  };
+  /** Render a card into the off-screen full-size node and rasterise it. */
+  const renderAndCapture = useCallback(async (index: number) => {
+    if (avatarPromise.current) await avatarPromise.current;
+    flushSync(() => setCaptureIdx(index));
+    await raf2();
+    const node = captureRef.current;
+    if (!node) throw new Error("WrappedCarousel: capture node missing");
+    return captureNode(node, DOWNLOAD_PIXEL_RATIO);
+  }, []);
+
+  const handleSave = useCallback(
+    async (index: number) => {
+      if (busy) return;
+      setBusy("save");
+      try {
+        const url = await renderAndCapture(index);
+        downloadDataUrl(url, `discord-wrapped-${cards[index].id}.png`);
+      } finally {
+        setBusy(null);
+      }
+    },
+    [busy, cards, renderAndCapture],
+  );
+
+  const handleSaveAll = useCallback(async () => {
+    if (busy) return;
+    setBusy("all");
+    try {
+      for (let i = 0; i < cards.length; i++) {
+        const url = await renderAndCapture(i);
+        downloadDataUrl(
+          url,
+          `discord-wrapped-${i + 1}-${cards[i].id}.png`,
+        );
+        await new Promise((r) => setTimeout(r, 150));
+      }
+    } finally {
+      setBusy(null);
+    }
+  }, [busy, cards, renderAndCapture]);
+
+  const canShare =
+    typeof navigator !== "undefined" && typeof navigator.share === "function";
+
+  const handleShare = useCallback(
+    async (index: number) => {
+      if (busy) return;
+      setBusy("share");
+      try {
+        const url = await renderAndCapture(index);
+        const blob = await (await fetch(url)).blob();
+        const file = new File([blob], `discord-wrapped-${cards[index].id}.png`, {
+          type: "image/png",
+        });
+        if (navigator.canShare?.({ files: [file] })) {
+          await navigator.share({ files: [file], title: "My Discord Wrapped" });
+        } else {
+          downloadDataUrl(url, file.name);
+        }
+      } catch {
+        /* user dismissed the share sheet — ignore */
+      } finally {
+        setBusy(null);
+      }
+    },
+    [busy, cards, renderAndCapture],
+  );
 
   const activeCard = cards[active];
-  const accentColor = activeCard?.bg ?? "#5865F2";
+  const accent = activeCard?.accent ?? "#9572e8";
 
-  return createPortal(
+  const slideVariants = {
+    enter: (d: number) => ({ x: d > 0 ? cardW + 48 : -(cardW + 48), opacity: 0 }),
+    center: { x: 0, opacity: 1 },
+    exit: (d: number) => ({ x: d > 0 ? -(cardW + 48) : cardW + 48, opacity: 0 }),
+  };
+
+  return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[100] flex flex-col items-center overflow-hidden"
+      className="fixed inset-0 z-[100] flex flex-col items-center overflow-y-auto"
       style={{
         background: "rgba(0,0,0,0.96)",
         backdropFilter: "blur(24px)",
-
         justifyContent: isMobile ? "flex-start" : "center",
-        paddingTop: isMobile ? 0 : undefined,
       }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
+      {/* off-screen full-size node used only for PNG capture */}
+      <div
+        ref={captureRef}
+        aria-hidden
+        style={{
+          position: "fixed",
+          left: -99999,
+          top: 0,
+          width: CARD_W,
+          height: CARD_H,
+          pointerEvents: "none",
+          zIndex: -1,
+        }}
+      >
+        {cards[captureIdx] && (
+          <ScaledCard
+            def={cards[captureIdx]}
+            stats={stats}
+            avatarUrl={avatarUrl}
+            scale={1}
+          />
+        )}
+      </div>
+
       <button
         onClick={onClose}
-        className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 transition text-white z-20"
+        className="fixed top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 transition text-white z-20"
         style={{ WebkitTapHighlightColor: "transparent" }}
       >
         <X className="w-5 h-5" />
       </button>
 
-      <div
-        className="w-full text-center z-10 flex-shrink-0"
-        style={{
-          paddingTop: isMobile ? 20 : undefined,
-          marginBottom: isMobile ? 14 : undefined,
-        }}
-      >
+      <div className="w-full text-center flex-shrink-0 pt-5 pb-3">
         <p className="text-[10px] uppercase tracking-[0.22em] text-white/35 mb-0.5">
           Discord Wrapped
         </p>
         <h2 className="text-white font-bold text-[17px]">
-          {data.self.username}
+          {stats.self.username}
         </h2>
       </div>
 
-      {loading ? (
-        /* ── Loading state ── */
-        <div className="flex flex-col items-center gap-5 text-white/60 px-8 w-full max-w-[280px] mt-16">
-          <div className="relative w-14 h-14 flex items-center justify-center">
-            <svg
-              className="absolute inset-0 w-full h-full -rotate-90"
-              viewBox="0 0 56 56"
-            >
-              <circle
-                cx="28"
-                cy="28"
-                r="24"
-                fill="none"
-                stroke="rgba(255,255,255,0.1)"
-                strokeWidth="3"
-              />
-              <circle
-                cx="28"
-                cy="28"
-                r="24"
-                fill="none"
-                stroke="#5865F2"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeDasharray={`${2 * Math.PI * 24}`}
-                strokeDashoffset={`${2 * Math.PI * 24 * (1 - loadProgress / 100)}`}
-                style={{ transition: "stroke-dashoffset 0.4s ease" }}
-              />
-            </svg>
-            <span className="text-xs font-bold text-white/70">
-              {loadProgress}%
-            </span>
-          </div>
-          <p className="text-sm text-center leading-relaxed">
-            Building your cards…
-            <br />
-            <span className="text-xs opacity-50">
-              Rendering at full quality
-            </span>
-          </p>
-        </div>
-      ) : (
+      <div className="flex items-center gap-3 px-4">
+        {!isMobile && (
+          <button
+            onClick={() => go(-1)}
+            className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-90 transition text-white flex-shrink-0"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+        )}
+
         <div
-          className="flex flex-col items-center w-full flex-1"
-          style={{
-            overflowY: isMobile ? "auto" : "visible",
-            paddingBottom: isMobile ? 24 : 0,
+          className="relative flex-shrink-0"
+          style={{ width: cardW, height: cardH }}
+          onTouchStart={(e) => {
+            touchStartX.current = e.touches[0].clientX;
+          }}
+          onTouchEnd={(e) => {
+            if (touchStartX.current === null) return;
+            const diff = touchStartX.current - e.changedTouches[0].clientX;
+            if (Math.abs(diff) > 36) go(diff > 0 ? 1 : -1);
+            touchStartX.current = null;
           }}
         >
-          <div className="flex items-center gap-3 px-4">
-            {!isMobile && (
-              <button
-                onClick={() => go(-1)}
-                className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-90 transition text-white flex-shrink-0"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-            )}
-
-            <div
-              className="relative flex-shrink-0"
-              style={{
-                width: cardW,
-                height: cardH,
-                borderRadius: 16,
-                overflow: "hidden",
-              }}
-              onTouchStart={(e) => {
-                touchStartX.current = e.touches[0].clientX;
-              }}
-              onTouchEnd={(e) => {
-                if (touchStartX.current === null) return;
-                const diff = touchStartX.current - e.changedTouches[0].clientX;
-                if (Math.abs(diff) > 36) go(diff > 0 ? 1 : -1);
-                touchStartX.current = null;
-              }}
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  inset: -24,
-                  zIndex: 0,
-                  background: `radial-gradient(ellipse at 50% 50%, ${accentColor}55 0%, transparent 70%)`,
-                  transition: "background 0.5s ease",
-                  filter: "blur(20px)",
-                  pointerEvents: "none",
-                }}
-              />
-
-              <AnimatePresence custom={direction} mode="popLayout">
-                <motion.div
-                  key={activeCard?.id}
-                  custom={direction}
-                  variants={slideVariants}
-                  initial="enter"
-                  animate="center"
-                  exit="exit"
-                  transition={{ type: "spring", stiffness: 360, damping: 34 }}
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    borderRadius: 16,
-                    overflow: "hidden",
-                    zIndex: 1,
-                  }}
-                >
-                  {activeCard && (
-                    <img
-                      src={activeCard.dataUrl}
-                      alt={activeCard.label}
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                        display: "block",
-                      }}
-                      draggable={false}
-                    />
-                  )}
-                </motion.div>
-              </AnimatePresence>
-            </div>
-
-            {!isMobile && (
-              <button
-                onClick={() => go(1)}
-                className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-90 transition text-white flex-shrink-0"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            )}
-          </div>
-
-          {isMobile && (
-            <div className="flex items-center gap-4 mt-4 px-4">
-              <button
-                onClick={() => go(-1)}
-                className="p-2 rounded-full bg-white/10 active:bg-white/20 transition text-white flex-shrink-0"
-                style={{ WebkitTapHighlightColor: "transparent" }}
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-
-              <div className="flex items-center gap-1.5 flex-1 justify-center">
-                {cards.map((c, i) => (
-                  <button
-                    key={c.id}
-                    onClick={() => {
-                      setDirection(i > active ? 1 : -1);
-                      setActive(i);
-                    }}
-                    style={{
-                      width: i === active ? 18 : 5,
-                      height: 5,
-                      borderRadius: 3,
-                      background:
-                        i === active ? accentColor : "rgba(255,255,255,0.18)",
-                      transition: "all 0.3s ease",
-                      border: "none",
-                      cursor: "pointer",
-                      padding: 0,
-                      flexShrink: 0,
-                    }}
-                  />
-                ))}
-              </div>
-
-              <button
-                onClick={() => go(1)}
-                className="p-2 rounded-full bg-white/10 active:bg-white/20 transition text-white flex-shrink-0"
-                style={{ WebkitTapHighlightColor: "transparent" }}
-              >
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            </div>
-          )}
-
-          {!isMobile && (
-            <div className="flex gap-2 mt-4">
-              {cards.map((c, i) => (
-                <button
-                  key={c.id}
-                  onClick={() => {
-                    setDirection(i > active ? 1 : -1);
-                    setActive(i);
-                  }}
-                  style={{
-                    width: i === active ? 20 : 5,
-                    height: 5,
-                    borderRadius: 3,
-                    background:
-                      i === active ? accentColor : "rgba(255,255,255,0.18)",
-                    transition: "all 0.3s ease",
-                    border: "none",
-                    cursor: "pointer",
-                    padding: 0,
-                    flexShrink: 0,
-                  }}
-                />
-              ))}
-            </div>
-          )}
-
-          <div className="flex items-center gap-2.5 mt-3">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-white/40">
-              {activeCard?.label}
-            </p>
-            <span className="text-[10px] text-white/20">
-              {active + 1}/{cards.length}
-            </span>
-          </div>
-
           <div
-            className="flex mt-3 mb-2"
             style={{
-              flexDirection: isMobile ? "column" : "row",
-              gap: isMobile ? 10 : 12,
-              width: isMobile ? cardW : undefined,
-              padding: isMobile ? "0 0" : undefined,
+              position: "absolute",
+              inset: -28,
+              zIndex: 0,
+              background: `radial-gradient(ellipse at 50% 50%, ${accent}55 0%, transparent 70%)`,
+              transition: "background 0.5s ease",
+              filter: "blur(22px)",
+              pointerEvents: "none",
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              borderRadius: 18,
+              overflow: "hidden",
+              zIndex: 1,
+              boxShadow: "0 30px 80px rgba(0,0,0,0.5)",
             }}
           >
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              onClick={() => handleDownload(activeCard?.id)}
-              disabled={!!downloading}
-              className="flex items-center justify-center gap-2 rounded-full font-bold text-white text-sm transition-opacity"
-              style={{
-                background: accentColor,
-                opacity: downloading ? 0.6 : 1,
-                height: 48,
-                paddingLeft: 28,
-                paddingRight: 28,
-                letterSpacing: "0.01em",
-                width: isMobile ? "100%" : 210,
-                WebkitTapHighlightColor: "transparent",
-              }}
-            >
-              {downloading === activeCard?.id ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" /> Rendering 4K…
-                </>
-              ) : (
-                <>
-                  <Download className="w-4 h-4" /> Save 4K PNG
-                </>
-              )}
-            </motion.button>
-
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              onClick={async () => {
-                for (const c of cards) await handleDownload(c.id);
-              }}
-              disabled={!!downloading}
-              className="flex items-center justify-center gap-2 rounded-full font-bold text-sm transition-opacity"
-              style={{
-                background: "rgba(255,255,255,0.08)",
-                border: `1.5px solid ${accentColor}55`,
-                color: "rgba(255,255,255,0.75)",
-                opacity: downloading ? 0.6 : 1,
-                height: 48,
-                paddingLeft: 28,
-                paddingRight: 28,
-                letterSpacing: "0.01em",
-                width: isMobile ? "100%" : 210,
-                WebkitTapHighlightColor: "transparent",
-              }}
-            >
-              {downloading ? "Downloading…" : `Download all`}
-            </motion.button>
+            <AnimatePresence custom={direction} mode="popLayout">
+              <motion.div
+                key={activeCard?.id}
+                custom={direction}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ type: "spring", stiffness: 360, damping: 34 }}
+                style={{ position: "absolute", inset: 0 }}
+              >
+                {activeCard && (
+                  <ScaledCard
+                    def={activeCard}
+                    stats={stats}
+                    avatarUrl={avatarUrl}
+                    scale={scale}
+                  />
+                )}
+              </motion.div>
+            </AnimatePresence>
           </div>
         </div>
-      )}
-    </motion.div>,
-    document.body,
+
+        {!isMobile && (
+          <button
+            onClick={() => go(1)}
+            className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-90 transition text-white flex-shrink-0"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        )}
+      </div>
+
+      {/* dots */}
+      <div className="flex gap-1.5 mt-4 items-center">
+        {isMobile && (
+          <button
+            onClick={() => go(-1)}
+            className="p-2 rounded-full bg-white/10 active:bg-white/20 transition text-white flex-shrink-0 mr-1"
+            style={{ WebkitTapHighlightColor: "transparent" }}
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+        )}
+        {cards.map((c, i) => (
+          <button
+            key={c.id}
+            onClick={() => {
+              setDirection(i > active ? 1 : -1);
+              setActive(i);
+            }}
+            style={{
+              width: i === active ? 20 : 6,
+              height: 6,
+              borderRadius: 3,
+              background: i === active ? accent : "rgba(255,255,255,0.2)",
+              transition: "all 0.3s ease",
+              border: "none",
+              cursor: "pointer",
+              padding: 0,
+              flexShrink: 0,
+            }}
+          />
+        ))}
+        {isMobile && (
+          <button
+            onClick={() => go(1)}
+            className="p-2 rounded-full bg-white/10 active:bg-white/20 transition text-white flex-shrink-0 ml-1"
+            style={{ WebkitTapHighlightColor: "transparent" }}
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2.5 mt-3">
+        <p className="text-[10px] uppercase tracking-[0.18em] text-white/40">
+          {activeCard?.label}
+        </p>
+        <span className="text-[10px] text-white/20">
+          {active + 1}/{cards.length}
+        </span>
+      </div>
+
+      {/* actions */}
+      <div
+        className="flex mt-4 mb-6"
+        style={{
+          flexDirection: isMobile ? "column" : "row",
+          gap: isMobile ? 10 : 12,
+          width: isMobile ? cardW : undefined,
+        }}
+      >
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={() => (canShare ? handleShare(active) : handleSave(active))}
+          disabled={!!busy}
+          className="flex items-center justify-center gap-2 rounded-full font-bold text-white text-sm transition-opacity"
+          style={{
+            background: accent,
+            color: "#1a1024",
+            opacity: busy ? 0.6 : 1,
+            height: 48,
+            paddingLeft: 28,
+            paddingRight: 28,
+            width: isMobile ? "100%" : 210,
+            WebkitTapHighlightColor: "transparent",
+          }}
+        >
+          {busy === "save" || busy === "share" ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" /> Rendering…
+            </>
+          ) : canShare ? (
+            <>
+              <Share2 className="w-4 h-4" /> Share image
+            </>
+          ) : (
+            <>
+              <Download className="w-4 h-4" /> Save 4K PNG
+            </>
+          )}
+        </motion.button>
+
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={() => (canShare ? handleSave(active) : handleSaveAll())}
+          disabled={!!busy}
+          className="flex items-center justify-center gap-2 rounded-full font-bold text-sm transition-opacity"
+          style={{
+            background: "rgba(255,255,255,0.08)",
+            border: `1.5px solid ${accent}66`,
+            color: "rgba(255,255,255,0.82)",
+            opacity: busy ? 0.6 : 1,
+            height: 48,
+            paddingLeft: 28,
+            paddingRight: 28,
+            width: isMobile ? "100%" : 210,
+            WebkitTapHighlightColor: "transparent",
+          }}
+        >
+          {busy === "all" ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" /> Saving all…
+            </>
+          ) : canShare ? (
+            <>
+              <Download className="w-4 h-4" /> Save this card
+            </>
+          ) : (
+            "Download all"
+          )}
+        </motion.button>
+      </div>
+    </motion.div>
   );
 }
