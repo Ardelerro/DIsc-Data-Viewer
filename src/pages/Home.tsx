@@ -33,7 +33,6 @@ import {
   ArrowRight,
 } from "lucide-react";
 import WrappedCarousel from "../components/displays/WrappedDisplay";
-import type { WrappedCardData } from "../types/discord";
 import { ICON_BTN } from "../config/theme";
 import TimeRangeSelector from "../components/forms/TimeRangeSelector";
 
@@ -91,73 +90,6 @@ const Home: FC = () => {
     if (!dailyHourly) return memoizedHourly ?? {};
     return filterHourlyByRange(dailyHourly, dateRange);
   }, [data, dateRange, memoizedHourly]);
-
-  const wrappedData = useMemo<WrappedCardData | null>(() => {
-    if (!data) return null;
-
-    const topUsers: { username: string; messageCount: number }[] = [];
-    for (const [key, stats] of Object.entries(data.channelStats)) {
-      if (!stats.recipientName || !key.startsWith("dm_")) continue;
-      const totalMessages = Object.values(stats.hourly || {}).reduce(
-        (a, b) => a + b,
-        0,
-      );
-      topUsers.push({
-        username: stats.recipientName,
-        messageCount: totalMessages,
-      });
-    }
-    topUsers.sort((a, b) => b.messageCount - a.messageCount);
-
-    const serverStats: WrappedCardData["serverStats"] = {};
-    for (const [key, stats] of Object.entries(data.channelStats)) {
-      if (!key.startsWith("channel_")) continue;
-      const channelId = key.replace(/^channel_/, "");
-      const total = Object.values(stats.hourly || {}).reduce(
-        (sum, val) => sum + (val ?? 0),
-        0,
-      );
-      const type = data.channelMapping[channelId];
-      if (!["GUILD_TEXT", "PUBLIC_THREAD", "GUILD_VOICE"].includes(type))
-        continue;
-      const serverId =
-        data.serverMapping.channelToServer[channelId] ??
-        `unknown (${channelId})`;
-      if (!serverStats[serverId]) {
-        serverStats[serverId] = {
-          name:
-            data.serverMapping.serverNames[serverId] ??
-            `Unknown Server (${serverId})`,
-          messageCount: 0,
-        };
-      }
-      serverStats[serverId].messageCount += total;
-    }
-
-    return {
-      self: data.self,
-      aggregateStats: {
-        messageCount: data.aggregateStats.messageCount,
-        hourly: data.aggregateStats.hourly,
-        monthly: data.aggregateStats.monthly,
-        topWords: data.aggregateStats.topWords,
-      },
-      channelStats: Object.fromEntries(
-        Object.entries(data.channelStats).map(([id, ch]) => [
-          id,
-          {
-            monthly: ch.monthly,
-            hourly: ch.hourly,
-            daily: ch.daily,
-            name: data.channelNaming[id],
-          },
-        ]),
-      ),
-      activityStats: data.activityStats,
-      topUsers,
-      serverStats,
-    };
-  }, [data]);
 
   const iconBtn = ICON_BTN;
 
@@ -470,7 +402,7 @@ const Home: FC = () => {
       {showWrapped &&
         createPortal(
           <WrappedCarousel
-            data={wrappedData!}
+            data={data}
             onClose={() => setShowWrapped(false)}
           />,
           document.body,
