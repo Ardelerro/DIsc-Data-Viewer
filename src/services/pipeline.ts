@@ -1,14 +1,13 @@
 import type {
   ActivityStats,
-  PipelineEvent,
   ProcessedData,
-  UploadOptions,
 } from "../types/discord";
-import { processActivities } from "./activityProcessor";
-import { processZipData } from "./zipProcessor";
-import { processSentiment, type SentimentResult } from "./processSentiment";
+import { processActivities } from "./processors/activityProcessor";
+import { processZipData } from "./processors/zipProcessor";
+import { processSentiment, type SentimentResult } from "./processors/processSentiment";
 import { saveData as persistData, saveProfile } from "./dataStore";
-import { Profiler, logReport, type ProfileReport } from "./profiler";
+import { Profiler, logReport, type ProfileReport } from "../utils/serviceUtils/profiler";
+import type { UploadOptions, PipelineEvent } from "../types/worker";
 
 const ZERO_ACTIVITY: ActivityStats = {
   addReaction: 0,

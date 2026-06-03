@@ -8,11 +8,9 @@ import React, {
   useMemo,
 } from "react";
 import type {
-  DataContextType,
   ProcessedData,
-  UploadOptions,
 } from "../types/discord";
-import { refreshUserNames } from "../services/zipProcessor";
+import { refreshUserNames } from "../services/processors/zipProcessor";
 import {
   getData as loadStoredData,
   saveData as persistData,
@@ -24,6 +22,7 @@ import {
   clearJob,
   requestState,
 } from "../services/orchestratorClient";
+import type { DataContextType, UploadOptions } from "../types/worker";
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 

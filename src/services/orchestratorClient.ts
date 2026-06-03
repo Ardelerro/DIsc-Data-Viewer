@@ -1,11 +1,7 @@
 import OrchestratorSharedWorker from "./orchestrator.sharedworker.ts?sharedworker";
 import { JobRunner } from "./jobRunner";
-import type {
-  JobStatus,
-  OrchestratorEvent,
-  OrchestratorRequest,
-  UploadOptions,
-} from "../types/discord";
+import type { OrchestratorEvent, OrchestratorRequest, JobStatus, UploadOptions } from "../types/worker";
+
 
 type Listener = (event: OrchestratorEvent) => void;
 

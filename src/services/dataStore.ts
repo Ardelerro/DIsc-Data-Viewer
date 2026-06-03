@@ -1,5 +1,5 @@
 import type { ProcessedData } from "../types/discord";
-import type { ProfileReport } from "./profiler";
+import type { ProfileReport } from "../utils/serviceUtils/profiler";
 
 const DB_NAME = "discord-data-viewer";
 const STORE_NAME = "processed";

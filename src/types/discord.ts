@@ -1,4 +1,4 @@
-import type { ProfileBuckets } from "../services/profiler";
+import type { SentimentMethod } from "./worker";
 
 interface Self {
   id: string;
@@ -43,7 +43,6 @@ interface ServerMapping {
   serverNames: Record<string, string>;
 }
 
-type SentimentMethod = "lexicon" | "ai";
 
 interface ProcessedData {
   self: Self;
@@ -64,11 +63,7 @@ interface ProcessedData {
   sentimentSampleRate?: number;
 }
 
-interface UploadOptions {
-  aiSentiment: boolean;
 
-  sampleRate: number;
-}
 interface AggregateStats {
   hourly: Record<string, number>;
   monthly: Record<string, number>;
@@ -108,106 +103,11 @@ interface ActivityStats {
   appOpened: number;
 }
 
-interface DataContextType {
-  data: ProcessedData | null;
-  isLoading: boolean;
-  error: string | null;
-  hydrating: boolean;
-  activityProgress: number | null;
-  progress: number;
-  stage: string;
-  uploadData: (file: File, options: UploadOptions) => Promise<void>;
-  cancelUpload: () => void;
-  clearData: () => void;
-}
-
-type PipelineEvent =
-  | { type: "progress"; value: number; stage: string }
-  | { type: "snapshot"; data: ProcessedData }
-  | { type: "activityProgress"; value: number | null }
-  | { type: "done" }
-  | { type: "error"; message: string };
-
-type JobStatus = "idle" | "running" | "done" | "error";
-
-interface JobState {
-  status: JobStatus;
-  mainDone: boolean;
-  progress: number;
-  stage: string;
-  activityProgress: number | null;
-  snapshot: ProcessedData | null;
-  errorMessage: string | null;
-}
-
-type OrchestratorRequest =
-  | { type: "start"; file: File; options: UploadOptions }
-  | { type: "cancel" }
-  | { type: "getState" }
-  | { type: "clear" };
-
-type OrchestratorEvent = PipelineEvent | { type: "state"; state: JobState };
-
 interface ChannelSentiment {
   channelId: string;
   sentiment: SentimentStats;
   hourlySentimentAverage: Record<string, number>;
 }
-
-type SentimentWorkerRequest = {
-  type: "start";
-  file: File | Blob;
-  sampleRate: number;
-};
-
-type SentimentWorkerResponse =
-  | { type: "progress"; value: number }
-  | { type: "ready" }
-  | {
-      type: "result";
-      channels: ChannelSentiment[];
-
-      hourlySentimentTotal: Record<string, number>;
-      hourlyAnalyzedCount: Record<string, number>;
-
-      profile: ProfileBuckets;
-    }
-  | { type: "error"; message: string };
-
-type MessageWorkerRequest =
-  | {
-      type: "init";
-      file: File | Blob;
-      channelMapping: Record<string, string>;
-
-      aiMode: boolean;
-      streamThresholdBytes?: number;
-    }
-  | { type: "file"; filename: string }
-  | { type: "stop" };
-
-type MessageWorkerResponse =
-  | { type: "idle" }
-  | { type: "progress"; bytes: number }
-  | {
-      type: "result";
-      agg: PartialAgg;
-      channels: Array<{ channelId: string; stats: ChannelStats }>;
-
-      profile: ProfileBuckets;
-    }
-  | { type: "error"; message: string };
-
-type ActivityWorkerRequest =
-  | { type: "init"; file: File | Blob }
-  | { type: "file"; filename: string }
-  | { type: "stop" };
-
-type ActivityWorkerResponse =
-  | { type: "idle" }
-  | { type: "progress"; bytes: number }
-  | { type: "result"; counters: ActivityStats; profile: ProfileBuckets }
-  | { type: "error"; message: string };
 
 interface UserStats {
   channelId: string;
@@ -243,13 +143,10 @@ interface ChannelInfo {
 export type {
   Self,
   SentimentStats,
-  SentimentMethod,
   ChannelStats,
   ServerMapping,
   ProcessedData,
-  UploadOptions,
   ActivityStats,
-  DataContextType,
   TopChannel,
   UserStats,
   StreakStats,
@@ -257,16 +154,5 @@ export type {
   ChannelInfo,
   AggregateStats,
   PartialAgg,
-  MessageWorkerRequest,
-  MessageWorkerResponse,
-  ActivityWorkerRequest,
-  ActivityWorkerResponse,
   ChannelSentiment,
-  SentimentWorkerRequest,
-  SentimentWorkerResponse,
-  PipelineEvent,
-  JobStatus,
-  JobState,
-  OrchestratorRequest,
-  OrchestratorEvent,
 };

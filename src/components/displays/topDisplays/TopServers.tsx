@@ -5,7 +5,7 @@ import React from "react";
 import TopDisplay from "./TopDisplay";
 import MarqueeText from "../../text/MarqueeText";
 import type { ServerStats } from "../../../types/discord";
-import { countInRange, type DateRange } from "../../../utils/timeFilterUtils";
+import { countInRange, type DateRange } from "../../../utils/uiUtils/timeFilterUtils";
 
 const TopServers: FC<{ className?: string; dateRange?: DateRange | null }> = ({
   className = "",

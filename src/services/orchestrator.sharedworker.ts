@@ -1,8 +1,6 @@
+import type { OrchestratorEvent, OrchestratorRequest } from "../types/worker";
 import { JobRunner } from "./jobRunner";
-import type {
-  OrchestratorEvent,
-  OrchestratorRequest,
-} from "../types/discord";
+
 
 const ports = new Set<MessagePort>();
 

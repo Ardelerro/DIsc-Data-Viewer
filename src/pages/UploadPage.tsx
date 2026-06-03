@@ -4,9 +4,9 @@ import { motion } from "framer-motion";
 import * as Switch from "@radix-ui/react-switch";
 import { useData } from "../context/DataContext";
 import { useNavigate } from "react-router-dom";
-import { generateMockDiscordData } from "../utils/mockData";
+import { generateMockDiscordData } from "../utils/serviceUtils/mockData";
 import { saveData } from "../services/dataStore";
-import { isWebGPUAvailable } from "../services/processSentiment";
+import { isWebGPUAvailable } from "../services/processors/processSentiment";
 import type { ProcessedData } from "../types/discord";
 import { FEEDBACK } from "../config/theme";
 

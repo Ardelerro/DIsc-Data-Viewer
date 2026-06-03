@@ -12,7 +12,7 @@ import {
   type DateRange,
   filterMonthly,
   filterHourlyByRange,
-} from "../utils/timeFilterUtils";
+} from "../utils/uiUtils/timeFilterUtils";
 import SelfDisplay from "../components/displays/SelfDisplay";
 const HourlyChart = lazy(() => import("../components/charts/HourlyChart"));
 const HourlyMoodChart = lazy(

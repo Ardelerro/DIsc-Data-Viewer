@@ -1,11 +1,7 @@
 import { runPipeline } from "./pipeline";
 import { clearData } from "./dataStore";
-import type {
-  JobState,
-  OrchestratorEvent,
-  PipelineEvent,
-  UploadOptions,
-} from "../types/discord";
+import type { JobState, OrchestratorEvent, PipelineEvent, UploadOptions } from "../types/worker";
+
 
 export function createInitialJobState(): JobState {
   return {

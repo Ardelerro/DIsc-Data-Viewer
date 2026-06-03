@@ -5,7 +5,7 @@ import React from "react";
 import TopDisplay from "./TopDisplay";
 import MarqueeText from "../../text/MarqueeText";
 import type { ChannelInfo } from "../../../types/discord";
-import { countInRange, type DateRange } from "../../../utils/timeFilterUtils";
+import { countInRange, type DateRange } from "../../../utils/uiUtils/timeFilterUtils";
 
 const TopChannels: FC<{ className?: string; dateRange?: DateRange | null }> = ({
   className = "",

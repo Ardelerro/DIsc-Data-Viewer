@@ -1,0 +1,101 @@
+"filename", "language", "JSON", "TypeScript", "JSON with Comments", "TypeScript JSX", "HTML", "JavaScript", "XML", "PostCSS", "Markdown", "comment", "blank", "total"
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\README.md", "Markdown", 0, 0, 0, 0, 0, 0, 0, 0, 19, 0, 11, 30
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\api\discord-user.ts", "TypeScript", 0, 206, 0, 0, 0, 0, 0, 0, 0, 3, 30, 239
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\assembly\scanner.ts", "TypeScript", 0, 54, 0, 0, 0, 0, 0, 0, 0, 0, 6, 60
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\assembly\tsconfig.json", "JSON with Comments", 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 1, 5
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\eslint.config.js", "JavaScript", 0, 0, 0, 0, 0, 27, 0, 0, 0, 0, 2, 29
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\index.html", "HTML", 0, 0, 0, 0, 34, 0, 0, 0, 0, 0, 2, 36
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\package-lock.json", "JSON", 5445, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5446
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\package.json", "JSON", 47, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 48
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\public\disc_viewer_logo.svg", "XML", 0, 0, 0, 0, 0, 0, 9, 0, 0, 0, 0, 9
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\public\vite.svg", "XML", 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\scripts\embedWasm.mjs", "JavaScript", 0, 0, 0, 0, 0, 16, 0, 0, 0, 0, 5, 21
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\App.css", "PostCSS", 0, 0, 0, 0, 0, 0, 0, 31, 0, 0, 5, 36
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\App.tsx", "TypeScript JSX", 0, 0, 0, 13, 0, 0, 0, 0, 0, 0, 3, 16
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\achievements\AchievementBubble.tsx", "TypeScript JSX", 0, 0, 0, 138, 0, 0, 0, 0, 0, 0, 7, 145
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\achievements\PersonalityBadge.tsx", "TypeScript JSX", 0, 0, 0, 58, 0, 0, 0, 0, 0, 0, 5, 63
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\achievements\achievements.ts", "TypeScript", 0, 730, 0, 0, 0, 0, 0, 0, 0, 0, 31, 761
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\achievements\computePersonality.ts", "TypeScript", 0, 462, 0, 0, 0, 0, 0, 0, 0, 0, 70, 532
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\assets\react.svg", "XML", 0, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0, 6
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\AppWrapper.tsx", "TypeScript JSX", 0, 0, 0, 63, 0, 0, 0, 0, 0, 0, 4, 67
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\Avatar.tsx", "TypeScript JSX", 0, 0, 0, 37, 0, 0, 0, 0, 0, 0, 6, 43
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\GlobalProcessingIndicator.tsx", "TypeScript JSX", 0, 0, 0, 46, 0, 0, 0, 0, 0, 0, 6, 52
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\ThemeProvider.tsx", "TypeScript JSX", 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 12, 52
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\charts\HourlyChart.tsx", "TypeScript JSX", 0, 0, 0, 89, 0, 0, 0, 0, 0, 0, 5, 94
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\charts\HourlyMoodChart.tsx", "TypeScript JSX", 0, 0, 0, 100, 0, 0, 0, 0, 0, 0, 8, 108
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\charts\MonthlyChart.tsx", "TypeScript JSX", 0, 0, 0, 107, 0, 0, 0, 0, 0, 0, 9, 116
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\charts\SentimentBar.tsx", "TypeScript JSX", 0, 0, 0, 99, 0, 0, 0, 0, 0, 0, 13, 112
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\displays\SelfDisplay.tsx", "TypeScript JSX", 0, 0, 0, 353, 0, 0, 0, 0, 0, 4, 33, 390
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\displays\SettingsDisplay.tsx", "TypeScript JSX", 0, 0, 0, 82, 0, 0, 0, 0, 0, 1, 9, 92
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\displays\WrappedDisplay.tsx", "TypeScript JSX", 0, 0, 0, 433, 0, 0, 0, 0, 0, 6, 30, 469
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\displays\topDisplays\TopChannels.tsx", "TypeScript JSX", 0, 0, 0, 77, 0, 0, 0, 0, 0, 0, 6, 83
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\displays\topDisplays\TopDisplay.tsx", "TypeScript JSX", 0, 0, 0, 74, 0, 0, 0, 0, 0, 0, 8, 82
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\displays\topDisplays\TopServers.tsx", "TypeScript JSX", 0, 0, 0, 73, 0, 0, 0, 0, 0, 0, 6, 79
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\displays\topDisplays\TopStreaks.tsx", "TypeScript JSX", 0, 0, 0, 115, 0, 0, 0, 0, 0, 0, 10, 125
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\displays\topDisplays\TopUsers.tsx", "TypeScript JSX", 0, 0, 0, 77, 0, 0, 0, 0, 0, 0, 6, 83
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\forms\TimeRangeSelector.tsx", "TypeScript JSX", 0, 0, 0, 89, 0, 0, 0, 0, 0, 0, 8, 97
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\forms\UserComboBox.tsx", "TypeScript JSX", 0, 0, 0, 101, 0, 0, 0, 0, 0, 0, 11, 112
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\search\Search.tsx", "TypeScript JSX", 0, 0, 0, 42, 0, 0, 0, 0, 0, 0, 5, 47
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\search\ServerSearch.tsx", "TypeScript JSX", 0, 0, 0, 271, 0, 0, 0, 0, 0, 0, 32, 303
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\search\UserSearch.tsx", "TypeScript JSX", 0, 0, 0, 341, 0, 0, 0, 0, 0, 0, 28, 369
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\stats\StaggeredStatGrid.tsx", "TypeScript JSX", 0, 0, 0, 54, 0, 0, 0, 0, 0, 0, 5, 59
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\stats\Stat.tsx", "TypeScript JSX", 0, 0, 0, 37, 0, 0, 0, 0, 0, 0, 4, 41
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\text\MarqueeText.tsx", "TypeScript JSX", 0, 0, 0, 122, 0, 0, 0, 0, 0, 0, 21, 143
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\wrapped\WrappedCardDef.ts", "TypeScript", 0, 86, 0, 0, 0, 0, 0, 0, 0, 0, 1, 87
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\wrapped\WrappedCards.tsx", "TypeScript JSX", 0, 0, 0, 109, 0, 0, 0, 0, 0, 0, 9, 118
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\wrapped\cards\ActivityCard.tsx", "TypeScript JSX", 0, 0, 0, 51, 0, 0, 0, 0, 0, 0, 1, 52
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\wrapped\cards\CoverCard.tsx", "TypeScript JSX", 0, 0, 0, 38, 0, 0, 0, 0, 0, 0, 2, 40
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\wrapped\cards\HoursCard.tsx", "TypeScript JSX", 0, 0, 0, 99, 0, 0, 0, 0, 0, 0, 4, 103
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\wrapped\cards\MoodCard.tsx", "TypeScript JSX", 0, 0, 0, 82, 0, 0, 0, 0, 0, 0, 2, 84
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\wrapped\cards\PeopleCard.tsx", "TypeScript JSX", 0, 0, 0, 110, 0, 0, 0, 0, 0, 0, 2, 112
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\wrapped\cards\PersonalityCard.tsx", "TypeScript JSX", 0, 0, 0, 66, 0, 0, 0, 0, 0, 0, 1, 67
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\wrapped\cards\StreaksCard.tsx", "TypeScript JSX", 0, 0, 0, 61, 0, 0, 0, 0, 0, 0, 3, 64
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\wrapped\cards\TotalCard.tsx", "TypeScript JSX", 0, 0, 0, 31, 0, 0, 0, 0, 0, 0, 1, 32
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\components\wrapped\cards\WordsCard.tsx", "TypeScript JSX", 0, 0, 0, 48, 0, 0, 0, 0, 0, 0, 2, 50
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\config\design.cjs", "JavaScript", 0, 0, 0, 0, 0, 70, 0, 0, 0, 48, 16, 134
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\config\theme.ts", "TypeScript", 0, 141, 0, 0, 0, 0, 0, 0, 0, 7, 15, 163
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\context\DataContext.tsx", "TypeScript JSX", 0, 0, 0, 179, 0, 0, 0, 0, 0, 1, 16, 196
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\index.css", "PostCSS", 0, 0, 0, 0, 0, 0, 0, 48, 0, 2, 6, 56
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\main.tsx", "TypeScript JSX", 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 2, 11
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\pages\ErrorPage.tsx", "TypeScript JSX", 0, 0, 0, 65, 0, 0, 0, 0, 0, 0, 8, 73
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\pages\Home.tsx", "TypeScript JSX", 0, 0, 0, 395, 0, 0, 0, 0, 0, 6, 20, 421
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\pages\Search.tsx", "TypeScript JSX", 0, 0, 0, 44, 0, 0, 0, 0, 0, 0, 6, 50
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\pages\SearchServer.tsx", "TypeScript JSX", 0, 0, 0, 44, 0, 0, 0, 0, 0, 0, 6, 50
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\pages\UploadPage.tsx", "TypeScript JSX", 0, 0, 0, 354, 0, 0, 0, 0, 0, 0, 32, 386
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\services\dataStore.ts", "TypeScript", 0, 182, 0, 0, 0, 0, 0, 0, 0, 0, 20, 202
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\services\jobRunner.ts", "TypeScript", 0, 87, 0, 0, 0, 0, 0, 0, 0, 0, 12, 99
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\services\orchestrator.sharedworker.ts", "TypeScript", 0, 41, 0, 0, 0, 0, 0, 0, 0, 0, 8, 49
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\services\orchestratorClient.ts", "TypeScript", 0, 104, 0, 0, 0, 0, 0, 0, 0, 0, 16, 120
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\services\pipeline.ts", "TypeScript", 0, 190, 0, 0, 0, 0, 0, 0, 0, 0, 20, 210
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\services\processors\activityProcessor.ts", "TypeScript", 0, 151, 0, 0, 0, 0, 0, 0, 0, 0, 21, 172
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\services\processors\processSentiment.ts", "TypeScript", 0, 72, 0, 0, 0, 0, 0, 0, 0, 0, 11, 83
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\services\processors\workers\activity.worker.ts", "TypeScript", 0, 227, 0, 0, 0, 0, 0, 0, 0, 2, 31, 260
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\services\processors\workers\messages.worker.ts", "TypeScript", 0, 385, 0, 0, 0, 0, 0, 0, 0, 0, 40, 425
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\services\processors\workers\sentiment.worker.ts", "TypeScript", 0, 251, 0, 0, 0, 0, 0, 0, 0, 0, 34, 285
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\services\processors\zipProcessor.ts", "TypeScript", 0, 509, 0, 0, 0, 0, 0, 0, 0, 0, 57, 566
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\types\discord.ts", "TypeScript", 0, 141, 0, 0, 0, 0, 0, 0, 0, 0, 18, 159
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\types\styles.ts", "TypeScript", 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\types\types.d.ts", "TypeScript", 0, 98, 0, 0, 0, 0, 0, 0, 0, 0, 11, 109
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\types\worker.ts", "TypeScript", 0, 102, 0, 0, 0, 0, 0, 0, 0, 0, 20, 122
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\utils\serviceUtils\deviceProfile.ts", "TypeScript", 0, 43, 0, 0, 0, 0, 0, 0, 0, 0, 10, 53
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\utils\serviceUtils\discordUser.ts", "TypeScript", 0, 178, 0, 0, 0, 0, 0, 0, 0, 1, 22, 201
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\utils\serviceUtils\messageStream.ts", "TypeScript", 0, 72, 0, 0, 0, 0, 0, 0, 0, 0, 9, 81
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\utils\serviceUtils\mockData.ts", "TypeScript", 0, 553, 0, 0, 0, 0, 0, 0, 0, 0, 56, 609
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\utils\serviceUtils\profiler.ts", "TypeScript", 0, 98, 0, 0, 0, 0, 0, 0, 0, 0, 16, 114
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\utils\serviceUtils\sentimentAnalyzer.ts", "TypeScript", 0, 796, 0, 0, 0, 0, 0, 0, 0, 0, 13, 809
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\utils\serviceUtils\streakUtils.ts", "TypeScript", 0, 29, 0, 0, 0, 0, 0, 0, 0, 0, 6, 35
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\utils\serviceUtils\textUtils.ts", "TypeScript", 0, 129, 0, 0, 0, 0, 0, 0, 0, 0, 10, 139
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\utils\uiUtils\PageWrapper.tsx", "TypeScript JSX", 0, 0, 0, 20, 0, 0, 0, 0, 0, 0, 4, 24
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\utils\uiUtils\generateWrapped.tsx", "TypeScript JSX", 0, 0, 0, 159, 0, 0, 0, 0, 0, 0, 13, 172
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\utils\uiUtils\sentimentScale.ts", "TypeScript", 0, 21, 0, 0, 0, 0, 0, 0, 0, 0, 6, 27
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\utils\uiUtils\timeFilterUtils.ts", "TypeScript", 0, 87, 0, 0, 0, 0, 0, 0, 0, 0, 10, 97
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\utils\uiUtils\wrappedStats.ts", "TypeScript", 0, 276, 0, 0, 0, 0, 0, 0, 0, 6, 26, 308
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\vite-env.d.ts", "TypeScript", 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\wasm\acAutomaton.ts", "TypeScript", 0, 75, 0, 0, 0, 0, 0, 0, 0, 0, 13, 88
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\src\wasm\byteScanner.ts", "TypeScript", 0, 82, 0, 0, 0, 0, 0, 0, 0, 0, 16, 98
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\tsconfig.app.json", "JSON", 23, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 28
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\tsconfig.json", "JSON with Comments", 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 1, 8
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\tsconfig.node.json", "JSON", 21, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 26
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\vercel.json", "JSON", 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 17
+"c:\Users\tassm\Downloads\New folder (103)\DIsc-Data-Viewer\vite.config.ts", "TypeScript", 0, 313, 0, 0, 0, 0, 0, 0, 0, 24, 34, 371
+"Total", "-", 5552, 6972, 11, 5095, 34, 113, 16, 79, 19, 116, 1213, 19220

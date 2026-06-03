@@ -1,7 +1,7 @@
 import type { FC } from "react";
-import { FitText } from "../../../utils/generateWrapped";
+import { FitText } from "../../../utils/uiUtils/generateWrapped";
 import { type CardProps, CardFrame } from "../WrappedCards";
-import { Blob } from "../../../utils/generateWrapped";
+import { Blob } from "../../../utils/uiUtils/generateWrapped";
 
 function WordChips({ words, accent }: { words: string[]; accent: string }) {
   return (

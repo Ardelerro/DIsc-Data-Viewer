@@ -1,9 +1,9 @@
-import type { Self } from "../types/discord";
+import type { Self } from "../../types/discord";
 import {
   getCachedUsers,
   putCachedUsers,
   type CachedDiscordUser,
-} from "./dataStore";
+} from "../../services/dataStore";
 
 const TTL_MS = 1000 * 60 * 60 * 24 * 7;
 

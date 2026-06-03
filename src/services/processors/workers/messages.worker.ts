@@ -5,22 +5,21 @@ import {
   configure,
   type FileEntry,
 } from "@zip.js/zip.js";
-import { calculateStreak } from "../utils/streakUtils";
-import { getTopWords, STOP_WORDS } from "../utils/textUtils";
-import { analyzeText, tokenizeWords } from "../utils/sentimentAnalyzer";
+import { calculateStreak } from "../../../utils/serviceUtils/streakUtils";
+import { getTopWords, STOP_WORDS } from "../../../utils/serviceUtils/textUtils";
+import { analyzeText, tokenizeWords } from "../../../utils/serviceUtils/sentimentAnalyzer";
 import {
   classifyCompound,
   compoundToScore,
   lengthWeight,
-} from "../utils/sentimentScale";
-import { createStreamParser, parseTimestamp } from "./messageStream";
-import { Profiler } from "./profiler";
+} from "../../../utils/uiUtils/sentimentScale";
+import { createStreamParser, parseTimestamp } from "../../../utils/serviceUtils/messageStream";
+import { Profiler } from "../../../utils/serviceUtils/profiler";
 import type {
   PartialAgg,
   ChannelStats,
-  MessageWorkerRequest,
-  MessageWorkerResponse,
-} from "../types/discord";
+} from "../../../types/discord";
+import type { MessageWorkerResponse, MessageWorkerRequest } from "../../../types/worker";
 
 configure({ useWebWorkers: false });
 

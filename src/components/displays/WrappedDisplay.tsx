@@ -22,8 +22,8 @@ import {
   FALLBACK_AVATAR,
   CARD_W,
   CARD_H,
-} from "../../utils/generateWrapped";
-import { deriveWrappedStats } from "../../utils/wrappedStats";
+} from "../../utils/uiUtils/generateWrapped";
+import { deriveWrappedStats } from "../../utils/uiUtils/wrappedStats";
 import { enabledCards, type WrappedCardDef } from "../wrapped/WrappedCards";
 import type { ProcessedData } from "../../types/discord";
 

@@ -2,8 +2,8 @@ import {
   type FC,
   type ReactNode,
 } from "react";
-import { CARD_W, CARD_H } from "../../utils/generateWrapped";
-import type { WrappedStats } from "../../utils/wrappedStats";
+import { CARD_W, CARD_H } from "../../utils/uiUtils/generateWrapped";
+import type { WrappedStats } from "../../utils/uiUtils/wrappedStats";
 import { WRAPPED_CARDS } from "./WrappedCardDef";
 
 const FONT_FAMILY =

@@ -11,13 +11,13 @@ import type {
   ChannelStats,
   ProcessedData,
   Self,
-  MessageWorkerResponse,
-} from "../types/discord";
-import { getTopWords } from "../utils/textUtils";
-import { Profiler } from "./profiler";
-import { enrichUserMapping } from "./discordUser";
-import { getDeviceTuning } from "../utils/deviceProfile";
-import MessageWorker from "./messages.worker.ts?worker";
+} from "../../types/discord";
+import { getTopWords } from "../../utils/serviceUtils/textUtils";
+import { Profiler } from "../../utils/serviceUtils/profiler";
+import { enrichUserMapping } from "../../utils/serviceUtils/discordUser";
+import { getDeviceTuning } from "../../utils/serviceUtils/deviceProfile";
+import MessageWorker from "./workers/messages.worker.ts?worker";
+import type { MessageWorkerResponse } from "../../types/worker";
 
 configure({ useWebWorkers: true });
 const WORKER_SILENCE_TIMEOUT_MS = 60_000;

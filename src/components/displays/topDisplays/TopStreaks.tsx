@@ -6,8 +6,8 @@ import TopDisplay from "./TopDisplay";
 import MarqueeText from "../../text/MarqueeText";
 import type { StreakStats } from "../../../types/discord";
 import Avatar from "../../Avatar";
-import type { DateRange } from "../../../utils/timeFilterUtils";
-import { calculateStreak } from "../../../utils/streakUtils";
+import type { DateRange } from "../../../utils/uiUtils/timeFilterUtils";
+import { calculateStreak } from "../../../utils/serviceUtils/streakUtils";
 
 const TopStreaks: FC<{ className?: string; dateRange?: DateRange | null }> = ({
   className = "",

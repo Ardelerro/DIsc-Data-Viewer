@@ -6,7 +6,7 @@ import TopDisplay from "./TopDisplay";
 import MarqueeText from "../../text/MarqueeText";
 import type { UserStats } from "../../../types/discord";
 import Avatar from "../../Avatar";
-import { countInRange, type DateRange } from "../../../utils/timeFilterUtils";
+import { countInRange, type DateRange } from "../../../utils/uiUtils/timeFilterUtils";
 
 const TopUsers: FC<{ className?: string; dateRange?: DateRange | null }> = ({
   className = "",

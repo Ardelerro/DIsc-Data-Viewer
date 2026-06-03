@@ -1,9 +1,9 @@
-import SentimentWorker from "./sentiment.worker.ts?worker";
-import { Profiler } from "./profiler";
+import SentimentWorker from "./workers/sentiment.worker.ts?worker";
+import { Profiler } from "../../utils/serviceUtils/profiler";
 import type {
-  SentimentWorkerResponse,
   ChannelSentiment,
-} from "../types/discord";
+} from "../../types/discord";
+import type { SentimentWorkerResponse } from "../../types/worker";
 
 export interface SentimentResult {
   channels: ChannelSentiment[];

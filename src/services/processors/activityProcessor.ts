@@ -1,12 +1,11 @@
 import { BlobReader, ZipReader, type FileEntry } from "@zip.js/zip.js";
 import type {
   ActivityStats,
-  ActivityWorkerRequest,
-  ActivityWorkerResponse,
-} from "../types/discord";
-import { Profiler } from "./profiler";
-import { getDeviceTuning } from "../utils/deviceProfile";
-import ActivityWorker from "./activity.worker.ts?worker";
+} from "../../types/discord";
+import { Profiler } from "../../utils/serviceUtils/profiler";
+import { getDeviceTuning } from "../../utils/serviceUtils/deviceProfile";
+import ActivityWorker from "./workers/activity.worker.ts?worker";
+import type { ActivityWorkerRequest, ActivityWorkerResponse } from "../../types/worker";
 
 const WORKER_SILENCE_TIMEOUT_MS = 60_000;
 

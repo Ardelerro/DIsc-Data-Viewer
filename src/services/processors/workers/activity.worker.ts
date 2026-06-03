@@ -4,18 +4,17 @@ import {
   configure,
   type FileEntry,
 } from "@zip.js/zip.js";
-import { Profiler } from "./profiler";
-import { ByteScanner } from "../wasm/byteScanner";
+import { Profiler } from "../../../utils/serviceUtils/profiler";
+import { ByteScanner } from "../../../wasm/byteScanner";
 import {
   ACTIVITY_PATTERN_DEFS,
   ACTIVITY_PATTERNS,
   type ActivityKey,
-} from "../wasm/acAutomaton";
+} from "../../../wasm/acAutomaton";
 import type {
   ActivityStats,
-  ActivityWorkerRequest,
-  ActivityWorkerResponse,
-} from "../types/discord";
+} from "../../../types/discord";
+import type { ActivityWorkerResponse, ActivityWorkerRequest } from "../../../types/worker";
 
 configure({ useWebWorkers: false });
 

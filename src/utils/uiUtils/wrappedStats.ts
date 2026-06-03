@@ -1,7 +1,7 @@
-import type { ProcessedData } from "../types/discord";
-import type { Personality } from "../types/types";
-import { computePersonality } from "../achievements/computePersonality";
-import { calculateStreak } from "./streakUtils";
+import type { ProcessedData } from "../../types/discord";
+import type { Personality } from "../../types/types";
+import { computePersonality } from "../../achievements/computePersonality";
+import { calculateStreak } from "../serviceUtils/streakUtils";
 
 export interface WrappedTopPerson {
   name: string;

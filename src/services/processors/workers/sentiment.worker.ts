@@ -5,18 +5,13 @@ import {
   type FileEntry,
 } from "@zip.js/zip.js";
 import { pipeline, env } from "@huggingface/transformers";
-import { createStreamParser, parseTimestamp } from "./messageStream";
-import { Profiler } from "./profiler";
-import {
-  classifyCompound,
-  compoundToScore,
-  lengthWeight,
-} from "../utils/sentimentScale";
-import type {
-  SentimentWorkerRequest,
-  SentimentWorkerResponse,
-  ChannelSentiment,
-} from "../types/discord";
+import type { ChannelSentiment } from "../../../types/discord";
+import type { SentimentWorkerResponse, SentimentWorkerRequest } from "../../../types/worker";
+import { createStreamParser, parseTimestamp } from "../../../utils/serviceUtils/messageStream";
+import { compoundToScore, lengthWeight, classifyCompound } from "../../../utils/uiUtils/sentimentScale";
+import { Profiler } from "../../../utils/serviceUtils/profiler";
+
+
 
 configure({ useWebWorkers: false });
 

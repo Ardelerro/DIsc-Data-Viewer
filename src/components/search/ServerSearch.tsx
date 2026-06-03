@@ -13,7 +13,7 @@ import {
   countInRange,
   filterMonthly,
   filterHourlyByRange,
-} from "../../utils/timeFilterUtils";
+} from "../../utils/uiUtils/timeFilterUtils";
 import Search from "./Search";
 
 const ServerSearch: FC = () => {

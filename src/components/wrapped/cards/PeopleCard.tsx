@@ -1,7 +1,7 @@
 import type { FC } from "react";
-import { FitText, Divider, colCenter } from "../../../utils/generateWrapped";
+import { FitText, Divider, colCenter } from "../../../utils/uiUtils/generateWrapped";
 import { type CardProps, CardFrame } from "../WrappedCards";
-import { Blob } from "../../../utils/generateWrapped";
+import { Blob } from "../../../utils/uiUtils/generateWrapped";
 
 function InitialAvatar({ name, size }: { name: string; size: number }) {
   const trimmed = (name || "?").trim();

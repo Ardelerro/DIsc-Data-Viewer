@@ -1,7 +1,7 @@
 import type { FC } from "react";
-import { colCenter, FitText, Divider } from "../../../utils/generateWrapped";
+import { colCenter, FitText, Divider } from "../../../utils/uiUtils/generateWrapped";
 import { type CardProps, CardFrame } from "../WrappedCards";
-import { Blob } from "../../../utils/generateWrapped";
+import { Blob } from "../../../utils/uiUtils/generateWrapped";
 
 export const TotalCard: FC<CardProps> = ({ stats, avatarUrl, def }) => (
   <CardFrame

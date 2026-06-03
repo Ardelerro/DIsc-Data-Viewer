@@ -1,8 +1,8 @@
 import type { FC } from "react";
 import { CardFrame, type CardProps } from "../WrappedCards";
 import { Smile, Mic, Phone, Paperclip } from "lucide-react";
-import { colCenter, FitText } from "../../../utils/generateWrapped";
-import { Blob } from "../../../utils/generateWrapped";
+import { colCenter, FitText } from "../../../utils/uiUtils/generateWrapped";
+import { Blob } from "../../../utils/uiUtils/generateWrapped";
 const ACTIVITY_ICONS = { Smile, Mic, Phone, Paperclip };
 
 export const ActivityCard: FC<CardProps> = ({ stats, avatarUrl, def }) => {
