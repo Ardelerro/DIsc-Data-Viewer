@@ -7,12 +7,14 @@ import PageWrapper from "../utils/PageWrapper";
 import Home from "../pages/Home";
 import Search from "../pages/Search";
 import { ThemeProvider } from "./ThemeProvider";
+import GlobalProcessingIndicator from "./GlobalProcessingIndicator";
 
 function AppWrapper() {
   const location = useLocation();
 
   return (
     <ThemeProvider>
+      <GlobalProcessingIndicator />
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
           <Route

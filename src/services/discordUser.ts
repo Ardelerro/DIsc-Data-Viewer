@@ -7,9 +7,6 @@ import {
 
 const TTL_MS = 1000 * 60 * 60 * 24 * 7;
 
-
-
-
 const TRANSIENT_TTL_MS = 10 * 60 * 10;
 
 const BATCH = 50;

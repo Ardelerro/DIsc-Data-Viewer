@@ -114,14 +114,39 @@ interface DataContextType {
   error: string | null;
   hydrating: boolean;
   activityProgress: number | null;
-  uploadData: (
-    file: File,
-    options: UploadOptions,
-    onProgress: (progress: number, stage: string, eta?: number) => void,
-    signal?: AbortSignal,
-  ) => Promise<void>;
+  progress: number;
+  stage: string;
+  uploadData: (file: File, options: UploadOptions) => Promise<void>;
+  cancelUpload: () => void;
   clearData: () => void;
 }
+
+type PipelineEvent =
+  | { type: "progress"; value: number; stage: string }
+  | { type: "snapshot"; data: ProcessedData }
+  | { type: "activityProgress"; value: number | null }
+  | { type: "done" }
+  | { type: "error"; message: string };
+
+type JobStatus = "idle" | "running" | "done" | "error";
+
+interface JobState {
+  status: JobStatus;
+  mainDone: boolean;
+  progress: number;
+  stage: string;
+  activityProgress: number | null;
+  snapshot: ProcessedData | null;
+  errorMessage: string | null;
+}
+
+type OrchestratorRequest =
+  | { type: "start"; file: File; options: UploadOptions }
+  | { type: "cancel" }
+  | { type: "getState" }
+  | { type: "clear" };
+
+type OrchestratorEvent = PipelineEvent | { type: "state"; state: JobState };
 
 interface ChannelSentiment {
   channelId: string;
@@ -239,4 +264,9 @@ export type {
   ChannelSentiment,
   SentimentWorkerRequest,
   SentimentWorkerResponse,
+  PipelineEvent,
+  JobStatus,
+  JobState,
+  OrchestratorRequest,
+  OrchestratorEvent,
 };

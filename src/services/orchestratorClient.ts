@@ -1,0 +1,123 @@
+import OrchestratorSharedWorker from "./orchestrator.sharedworker.ts?sharedworker";
+import { JobRunner } from "./jobRunner";
+import type {
+  JobStatus,
+  OrchestratorEvent,
+  OrchestratorRequest,
+  UploadOptions,
+} from "../types/discord";
+
+type Listener = (event: OrchestratorEvent) => void;
+
+const listeners = new Set<Listener>();
+
+function dispatch(event: OrchestratorEvent): void {
+  for (const l of listeners) l(event);
+}
+
+let port: MessagePort | null = null;
+let fallback: JobRunner | null = null;
+
+function ensureBackend(): void {
+  if (port || fallback) return;
+  if (typeof SharedWorker !== "undefined") {
+    try {
+      const sw = new OrchestratorSharedWorker();
+      port = sw.port;
+      port.onmessage = (ev: MessageEvent<OrchestratorEvent>) => {
+        if (ev.data) dispatch(ev.data);
+      };
+      port.start();
+      return;
+    } catch (err) {
+      console.warn(
+        "SharedWorker unavailable; processing will run in-page (won't survive refresh):",
+        err,
+      );
+    }
+  }
+  fallback = new JobRunner((event) => dispatch(event));
+}
+
+function send(req: OrchestratorRequest): void {
+  ensureBackend();
+  if (port) {
+    port.postMessage(req);
+    return;
+  }
+  if (!fallback) return;
+  switch (req.type) {
+    case "start":
+      fallback.start(req.file, req.options);
+      break;
+    case "cancel":
+      fallback.cancel();
+      break;
+    case "clear":
+      fallback.clear();
+      break;
+    case "getState":
+      dispatch({ type: "state", state: fallback.state });
+      break;
+  }
+}
+
+let pendingResolve: (() => void) | null = null;
+let pendingReject: ((err: Error) => void) | null = null;
+let lastStatus: JobStatus = "idle";
+
+function settle(fn: () => void): void {
+  fn();
+  pendingResolve = null;
+  pendingReject = null;
+}
+
+listeners.add((event) => {
+  if (event.type === "done") {
+    settle(() => pendingResolve?.());
+  } else if (event.type === "error") {
+    settle(() => pendingReject?.(new Error(event.message)));
+  } else if (event.type === "state") {
+    const st = event.state.status;
+    if (st === "done" || (st === "running" && event.state.mainDone)) {
+      settle(() => pendingResolve?.());
+    } else if (st === "error") {
+      settle(() =>
+        pendingReject?.(new Error(event.state.errorMessage ?? "Processing failed")),
+      );
+    } else if (st === "idle" && lastStatus === "running") {
+      const abort = new Error("Aborted");
+      abort.name = "AbortError";
+      settle(() => pendingReject?.(abort));
+    }
+    lastStatus = st;
+  }
+});
+
+export function subscribe(listener: Listener): () => void {
+  listeners.add(listener);
+  ensureBackend();
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export function start(file: File, options: UploadOptions): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    pendingResolve = resolve;
+    pendingReject = reject;
+    send({ type: "start", file, options });
+  });
+}
+
+export function cancelUpload(): void {
+  send({ type: "cancel" });
+}
+
+export function clearJob(): void {
+  send({ type: "clear" });
+}
+
+export function requestState(): void {
+  send({ type: "getState" });
+}

@@ -76,7 +76,7 @@ const Home: FC = () => {
     URL.revokeObjectURL(url);
   }, [data]);
 
-  const [fabOnLeft, setFabOnLeft] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const memoizedHourly = useMemo(() => data?.aggregateStats.hourly, [data]);
   const memoizedMonthly = useMemo(() => data?.aggregateStats.monthly, [data]);
@@ -267,45 +267,61 @@ const Home: FC = () => {
           initial={{ y: 100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ type: "spring", stiffness: 45, damping: 14 }}
-          className={`fixed bottom-4 sm:hidden ${fabOnLeft ? "left-1/2 -translate-x-1/2" : "left-0 -translate-x-7"} flex items-center gap-2 z-50`}
+          className="fixed bottom-4 left-4 sm:hidden flex items-center gap-2 z-50 max-w-[calc(100vw-2rem)]"
         >
+          <motion.button
+            onClick={() => setMenuOpen((v) => !v)}
+            whileTap={{ scale: 0.9 }}
+            animate={menuOpen ? { rotate: 90 } : { rotate: 0 }}
+            transition={{ type: "spring", stiffness: 260, damping: 20 }}
+            className="shrink-0 p-2.5 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] cursor-pointer text-[var(--color-text-2)]"
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+          >
+            <MenuIcon className="w-5 h-5" />
+          </motion.button>
+
           <motion.div
             initial={false}
-            animate={fabOnLeft ? "open" : "closed"}
+            animate={menuOpen ? "open" : "closed"}
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
             variants={{
               open: { width: "auto", opacity: 1, pointerEvents: "auto", x: 0 },
               closed: { width: 0, opacity: 0, pointerEvents: "none", x: -10 },
             }}
-            className="flex items-center gap-1 overflow-hidden rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-0"
+            className="flex items-center gap-1 overflow-hidden rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-1.5 py-1"
           >
             <button
               onClick={() => setShowSettings(true)}
-              className="p-5 rounded-full cursor-pointer active:scale-90 transition text-[var(--color-text-3)]"
+              className="shrink-0 p-2 rounded-full cursor-pointer active:scale-90 transition text-[var(--color-text-3)]"
+              aria-label="Settings"
             >
-              <Settings className="w-8 h-8" />
+              <Settings className="w-5 h-5" />
             </button>
             <button
               onClick={() => setShowConfirmDelete(true)}
-              className="p-5 rounded-full cursor-pointer active:scale-90 transition text-[var(--color-text-3)]"
+              className="shrink-0 p-2 rounded-full cursor-pointer active:scale-90 transition text-[var(--color-text-3)]"
+              aria-label="Delete data"
             >
-              <Trash2 className="w-8 h-8" />
+              <Trash2 className="w-5 h-5" />
             </button>
             <button
               onClick={handleDownloadData}
-              className="p-5 rounded-full cursor-pointer active:scale-90 transition text-[var(--color-text-3)]"
+              className="shrink-0 p-2 rounded-full cursor-pointer active:scale-90 transition text-[var(--color-text-3)]"
+              aria-label="Download data"
             >
-              <Download className="w-8 h-8" />
+              <Download className="w-5 h-5" />
             </button>
             <button
               onClick={() => setShowWrapped(true)}
-              className="p-5 rounded-full cursor-pointer active:scale-90 transition text-[var(--color-text-3)]"
+              className="shrink-0 p-2 rounded-full cursor-pointer active:scale-90 transition text-[var(--color-text-3)]"
+              aria-label="Share Wrapped"
             >
-              <Share2Icon className="w-8 h-8" />
+              <Share2Icon className="w-5 h-5" />
             </button>
             <button
               onClick={toggleTheme}
-              className="relative p-5 rounded-full cursor-pointer active:scale-90 transition text-[var(--color-text-3)]"
+              className="relative shrink-0 w-9 h-9 rounded-full cursor-pointer active:scale-90 transition text-[var(--color-text-3)]"
+              aria-label="Toggle theme"
             >
               <motion.span
                 className="absolute inset-0 flex items-center justify-center"
@@ -316,7 +332,7 @@ const Home: FC = () => {
                 }}
                 transition={{ duration: 0.2, ease: "easeInOut" }}
               >
-                <Sun className="w-8 h-8" />
+                <Sun className="w-5 h-5" />
               </motion.span>
               <motion.span
                 className="absolute inset-0 flex items-center justify-center"
@@ -327,20 +343,10 @@ const Home: FC = () => {
                 }}
                 transition={{ duration: 0.2, ease: "easeInOut" }}
               >
-                <Moon className="w-8 h-8" />
+                <Moon className="w-5 h-5" />
               </motion.span>
             </button>
           </motion.div>
-
-          <motion.button
-            onClick={() => setFabOnLeft((v) => !v)}
-            whileTap={{ scale: 0.9 }}
-            animate={fabOnLeft ? { rotate: 90 } : { rotate: 0 }}
-            transition={{ type: "spring", stiffness: 260, damping: 20 }}
-            className="p-2.5 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] cursor-pointer text-[var(--color-text-2)]"
-          >
-            <MenuIcon className="w-4 h-4" />
-          </motion.button>
         </motion.div>,
         document.body,
       )}

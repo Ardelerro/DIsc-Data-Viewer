@@ -3,75 +3,35 @@ import React, {
   useContext,
   useState,
   useEffect,
+  useRef,
   type FC,
   useMemo,
 } from "react";
-import { configure } from "@zip.js/zip.js";
 import type {
-  ActivityStats,
   DataContextType,
   ProcessedData,
   UploadOptions,
 } from "../types/discord";
-import { processActivities } from "../services/activityProcessor";
-import { processZipData, refreshUserNames } from "../services/zipProcessor";
-import {
-  processSentiment,
-  type SentimentResult,
-} from "../services/processSentiment";
+import { refreshUserNames } from "../services/zipProcessor";
 import {
   getData as loadStoredData,
   saveData as persistData,
-  clearData as clearStoredData,
-  saveProfile,
 } from "../services/dataStore";
-import { Profiler, logReport, type ProfileReport } from "../services/profiler";
-
-configure({ useWebWorkers: true });
+import {
+  subscribe,
+  start as startJob,
+  cancelUpload as cancelJob,
+  clearJob,
+  requestState,
+} from "../services/orchestratorClient";
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
-
-const ZERO_ACTIVITY: ActivityStats = {
-  addReaction: 0,
-  attachmentsSent: 0,
-  joinVoice: 0,
-  startCall: 0,
-  joinCall: 0,
-  appOpened: 0,
-};
 
 export const useData = () => {
   const context = useContext(DataContext);
   if (!context) throw new Error("useData must be used within DataProvider");
   return context;
 };
-
-function applySentiment(
-  data: ProcessedData,
-  result: SentimentResult,
-  sampleRate: number,
-) {
-  for (const cs of result.channels) {
-    const type = data.channelMapping[cs.channelId];
-    if (!type) continue;
-    const key =
-      type === "DM" ? `dm_${cs.channelId}` : `channel_${cs.channelId}`;
-    const stats = data.channelStats[key];
-    if (!stats) continue;
-    stats.sentiment = cs.sentiment;
-    stats.hourlySentimentAverage = cs.hourlySentimentAverage;
-  }
-
-  const agg = data.aggregateStats;
-  agg.hourlySentimentTotal = result.hourlySentimentTotal;
-  const avg: Record<string, number> = {};
-  for (const h in result.hourlySentimentTotal) {
-    const an = result.hourlyAnalyzedCount[h] || 0;
-    avg[h] = an > 0 ? result.hourlySentimentTotal[h] / an : 0;
-  }
-  agg.hourlySentimentAverage = avg;
-  data.sentimentSampleRate = sampleRate;
-}
 
 export const DataProvider: FC<{ children: React.ReactNode }> = ({
   children,
@@ -80,214 +40,141 @@ export const DataProvider: FC<{ children: React.ReactNode }> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activityProgress, setActivityProgress] = useState<number | null>(null);
-
+  const [progress, setProgress] = useState(0);
+  const [stage, setStage] = useState("");
   const [hydrating, setHydrating] = useState(true);
+
+  const dataRef = useRef<ProcessedData | null>(null);
+  dataRef.current = data;
 
   useEffect(() => {
     let cancelled = false;
-    const controller = new AbortController();
-    loadStoredData()
-      .then((stored) => {
-        if (cancelled || !stored) return;
-        setData(stored);
-        const reRender = () => {
-          if (!cancelled) setData({ ...stored });
-        };
-        refreshUserNames(stored, controller.signal, reRender)
-          .then((changed) => {
-            if (cancelled || !changed) return;
-            const refreshed = { ...stored };
-            setData(refreshed);
-            void persistData(refreshed);
-          })
-          .catch((err) => {
-            if (err instanceof DOMException && err.name === "AbortError") return;
-            console.warn("Username refresh on load failed:", err);
-          });
-      })
-      .finally(() => {
-        if (!cancelled) setHydrating(false);
-      });
+    let hydrateStarted = false;
+    const enrichController = new AbortController();
+
+    const hydrateFromIDB = () => {
+      if (hydrateStarted) return;
+      hydrateStarted = true;
+      loadStoredData()
+        .then((stored) => {
+          if (cancelled) return;
+          if (!stored) {
+            setHydrating(false);
+            return;
+          }
+          if (!dataRef.current) setData(stored);
+          setHydrating(false);
+
+          const reRender = () => {
+            if (!cancelled) setData({ ...stored });
+          };
+          refreshUserNames(stored, enrichController.signal, reRender)
+            .then((changed) => {
+              if (cancelled || !changed) return;
+              const refreshed = { ...stored };
+              setData(refreshed);
+              void persistData(refreshed);
+            })
+            .catch((err) => {
+              if (err instanceof DOMException && err.name === "AbortError")
+                return;
+              console.warn("Username refresh on load failed:", err);
+            });
+        })
+        .catch(() => {
+          if (!cancelled) setHydrating(false);
+        });
+    };
+
+    const unsubscribe = subscribe((event) => {
+      if (cancelled) return;
+      switch (event.type) {
+        case "progress":
+          setProgress(event.value);
+          setStage(event.stage);
+          break;
+        case "snapshot":
+          setData(event.data);
+          break;
+        case "activityProgress":
+          setActivityProgress(event.value);
+          break;
+        case "done":
+          setIsLoading(false);
+          break;
+        case "error":
+          setError(event.message);
+          setIsLoading(false);
+          break;
+        case "state": {
+          const s = event.state;
+          if (s.status === "running") {
+            hydrateStarted = true; 
+            setIsLoading(!s.mainDone);
+            setProgress(s.progress);
+            setStage(s.stage);
+            setActivityProgress(s.activityProgress);
+            if (s.snapshot) setData(s.snapshot);
+            setHydrating(false);
+          } else if (s.status === "done") {
+            setIsLoading(false);
+            setActivityProgress(s.activityProgress);
+            if (s.snapshot) {
+              hydrateStarted = true;
+              setData(s.snapshot);
+              setHydrating(false);
+            } else {
+              hydrateFromIDB();
+            }
+          } else if (s.status === "error") {
+            setIsLoading(false);
+            if (s.errorMessage) setError(s.errorMessage);
+            hydrateFromIDB();
+          } else {
+            // idle
+            setIsLoading(false);
+            setActivityProgress(null);
+            hydrateFromIDB();
+          }
+          break;
+        }
+      }
+    });
+
+    requestState();
+
+    const timer = setTimeout(() => {
+      if (!cancelled) hydrateFromIDB();
+    }, 1000);
+
     return () => {
       cancelled = true;
-      controller.abort();
+      clearTimeout(timer);
+      enrichController.abort();
+      unsubscribe();
     };
   }, []);
 
-  const uploadData = async (
-    file: File,
-    options: UploadOptions,
-    onProgress?: (progress: number, stage: string, eta?: number) => void,
-    signal?: AbortSignal,
-  ) => {
-    setIsLoading(true);
+  const uploadData = async (file: File, options: UploadOptions) => {
     setError(null);
+    setProgress(0);
+    setStage("Processing your data...");
+    setIsLoading(true);
+    await startJob(file, options);
+  };
 
-    const prof = new Profiler();
-    const stopTotal = prof.start("total");
-
-    const stopPerceived = prof.start("orchestrator:perceived");
-
-    try {
-      const useAI = options.aiSentiment;
-      let msgPct = 0;
-      let sentPct = 0;
-
-      const wMsg = useAI ? 0.4 : 1;
-      const wSent = useAI ? 0.6 : 0;
-      const report = () => {
-        const combined = msgPct * wMsg + sentPct * wSent;
-        onProgress?.(Math.min(99, combined), "Processing your data...");
-      };
-
-      let resolveReady!: (ok: boolean) => void;
-      const modelReady = new Promise<boolean>((res) => (resolveReady = res));
-
-      const sentimentPromise: Promise<SentimentResult | null> = useAI
-        ? processSentiment(
-            file,
-            options.sampleRate,
-            (p) => {
-              sentPct = p;
-              report();
-            },
-            signal,
-            () => resolveReady(true),
-            prof,
-          ).catch((err) => {
-            resolveReady(false);
-            if (err instanceof Error && err.name === "AbortError") throw err;
-            console.error("AI sentiment failed; using lexicon sentiment:", err);
-            return null;
-          })
-        : Promise.resolve(null);
-
-      const stopModelWait = prof.start("orchestrator:modelReadyWait");
-      const aiMode = useAI ? await modelReady : false;
-      stopModelWait();
-
-      let current: ProcessedData | null = null;
-      let persistTimer: ReturnType<typeof setTimeout> | undefined;
-      const onEnriched = () => {
-        if (!current) return;
-        current = { ...current };
-        setData(current);
-        const snapshot = current;
-        clearTimeout(persistTimer);
-        persistTimer = setTimeout(() => void persistData(snapshot), 1500);
-      };
-
-      const stopPromiseAll = prof.start("orchestrator:promiseAll");
-      const [processed, sentimentResult] = await Promise.all([
-        processZipData(
-          file,
-          (p) => {
-            msgPct = p;
-            report();
-          },
-          signal,
-          aiMode,
-          prof,
-          onEnriched,
-        ),
-        sentimentPromise,
-      ]);
-      stopPromiseAll();
-
-      const fullData: ProcessedData = {
-        ...processed,
-        activityStats: { ...ZERO_ACTIVITY },
-        activityPending: true,
-        sentimentMethod: useAI && sentimentResult ? "ai" : "lexicon",
-      };
-      if (useAI && sentimentResult) {
-        applySentiment(fullData, sentimentResult, options.sampleRate);
-      }
-      current = fullData;
-
-      onProgress?.(99, "Saving data...");
-      setData(fullData);
-
-      try {
-        await prof.timeAsync("orchestrator:persist", () =>
-          persistData(fullData),
-        );
-      } catch (err) {
-        console.error("Failed to persist processed data:", err);
-      }
-
-      onProgress?.(100, "Complete!");
-
-      stopPerceived();
-
-      setActivityProgress(0);
-      const activityPromise = processActivities(
-        file,
-        (p) => setActivityProgress(p),
-        signal,
-        prof,
-      );
-
-      const finalizeProfile = () => {
-        stopTotal();
-        const buckets = prof.export();
-        const profileReport: ProfileReport = {
-          timestamp: Date.now(),
-          dateISO: new Date().toISOString(),
-          fileSizeBytes: file.size,
-          aiMode,
-          sampleRate: options.sampleRate,
-          messageCount: fullData.aggregateStats.messageCount,
-
-          workerCount: buckets["zip/msgworker/init:getEntries"]?.count ?? 0,
-          totalMs: buckets["total"]?.totalMs ?? 0,
-          buckets,
-        };
-        logReport(profileReport);
-        void saveProfile(profileReport);
-      };
-
-      activityPromise
-        .then(async (activityStats) => {
-          setActivityProgress(null);
-          current = {
-            ...(current ?? fullData),
-            activityStats,
-            activityPending: false,
-          };
-          setData(current);
-          try {
-            await persistData(current);
-          } catch (err) {
-            console.error("Failed to persist activity stats:", err);
-          }
-          finalizeProfile();
-        })
-        .catch((err) => {
-          setActivityProgress(null);
-          if (err instanceof Error && err.name === "AbortError") return;
-          console.error(
-            "Activity processing failed; counts left at zero:",
-            err,
-          );
-          current = { ...(current ?? fullData), activityPending: false };
-          setData(current);
-          finalizeProfile();
-        });
-    } catch (err) {
-      if (!(err instanceof Error && err.name === "AbortError")) {
-        setError(err instanceof Error ? err.message : "Unknown error");
-      }
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
+  const cancelUpload = () => {
+    cancelJob();
   };
 
   const clearData = () => {
     setData(null);
-    void clearStoredData();
+    setProgress(0);
+    setError(null);
+    setActivityProgress(null);
+    clearJob();
   };
+
   const contextValue = useMemo(
     () => ({
       data,
@@ -295,10 +182,13 @@ export const DataProvider: FC<{ children: React.ReactNode }> = ({
       error,
       hydrating,
       activityProgress,
+      progress,
+      stage,
       uploadData,
+      cancelUpload,
       clearData,
     }),
-    [data, isLoading, error, hydrating, activityProgress],
+    [data, isLoading, error, hydrating, activityProgress, progress, stage],
   );
   return (
     <DataContext.Provider value={contextValue}>{children}</DataContext.Provider>

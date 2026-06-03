@@ -1,5 +1,5 @@
 import type { FC } from "react";
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import * as Switch from "@radix-ui/react-switch";
 import { useData } from "../context/DataContext";
@@ -11,10 +11,9 @@ import type { ProcessedData } from "../types/discord";
 import { FEEDBACK } from "../config/theme";
 
 const UploadPage: FC = () => {
-  const { uploadData, isLoading } = useData();
+  const { uploadData, isLoading, progress, stage, cancelUpload } = useData();
 
   const [error, setError] = useState<string | null>(null);
-  const [progress, setProgress] = useState(0);
   const [eta, setEta] = useState<number | null>(null);
   const [aiSentiment, setAiSentiment] = useState(false);
   const [samplePct, setSamplePct] = useState(25);
@@ -22,7 +21,7 @@ const UploadPage: FC = () => {
   const startTimeRef = useRef<number | null>(null);
   const samplesRef = useRef<Array<{ p: number; t: number }>>([]);
   const lastEtaTickRef = useRef(0);
-  const abortRef = useRef<AbortController | null>(null);
+  const prevLoadingRef = useRef(false);
   const webGPU = useMemo(() => isWebGPUAvailable(), []);
   const navigate = useNavigate();
 
@@ -32,12 +31,18 @@ const UploadPage: FC = () => {
     lastEtaTickRef.current = 0;
   };
 
-  const onProgress = (newProgress: number) => {
+  useEffect(() => {
+    if (isLoading && !prevLoadingRef.current) {
+      resetTracking();
+      setEta(null);
+    }
+    prevLoadingRef.current = isLoading;
+    if (!isLoading) return;
+
     const now = performance.now();
-    const p = Math.max(0, Math.min(100, newProgress));
+    const p = Math.max(0, Math.min(100, progress));
 
     if (startTimeRef.current === null) startTimeRef.current = now;
-    setProgress(p);
 
     if (p >= 100) {
       setEta(0);
@@ -45,21 +50,17 @@ const UploadPage: FC = () => {
     }
 
     const elapsed = now - startTimeRef.current;
-    
     if (elapsed < 400 || p < 0.5) {
       setEta(null);
       return;
     }
 
-    
     const samples = samplesRef.current;
     samples.push({ p, t: now });
     while (samples.length > 0 && now - samples[0].t > 3000) samples.shift();
 
-    
     const cumulativeRate = p / elapsed;
 
-    
     let recentRate = cumulativeRate;
     if (samples.length >= 2) {
       const first = samples[0];
@@ -69,7 +70,6 @@ const UploadPage: FC = () => {
       if (dt > 150 && dp > 0) recentRate = dp / dt;
     }
 
-    
     const windowSpan = samples.length > 0 ? now - samples[0].t : 0;
     const recentWeight = Math.min(1, windowSpan / 1500);
     const rate =
@@ -77,11 +77,10 @@ const UploadPage: FC = () => {
 
     const remainingMs = rate > 0 ? (100 - p) / rate : 0;
 
-    
     if (now - lastEtaTickRef.current < 250) return;
     lastEtaTickRef.current = now;
     setEta(Math.max(0, remainingMs / 1000));
-  };
+  }, [progress, isLoading]);
 
   const handleZipUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -90,42 +89,31 @@ const UploadPage: FC = () => {
       return;
     }
 
-    const controller = new AbortController();
-    abortRef.current = controller;
-
     try {
       setError(null);
-      setProgress(0);
       setEta(null);
       resetTracking();
 
-      await uploadData(
-        file,
-        { aiSentiment: aiSentiment && webGPU, sampleRate: samplePct / 100 },
-        onProgress,
-        controller.signal,
-      );
-      setProgress(100);
+      await uploadData(file, {
+        aiSentiment: aiSentiment && webGPU,
+        sampleRate: samplePct / 100,
+      });
       setEta(0);
 
       setTimeout(() => navigate("/"), 500);
     } catch (err) {
-      
       if (!(err instanceof Error && err.name === "AbortError")) {
         setError(err instanceof Error ? err.message : "Failed to process file");
       }
-      setProgress(0);
       setEta(null);
       resetTracking();
     } finally {
-      abortRef.current = null;
-      
       e.target.value = "";
     }
   };
 
   const handleCancel = () => {
-    abortRef.current?.abort();
+    cancelUpload();
   };
 
   const handlePrecomputedUpload = async (
@@ -142,8 +130,6 @@ const UploadPage: FC = () => {
       const text = await file.text();
       const parsed = JSON.parse(text) as ProcessedData;
       await saveData(parsed);
-      setProgress(100);
-      setEta(0);
       setTimeout(() => window.location.replace("/"), 300);
     } catch {
       setError("Invalid precomputed data file");
@@ -344,7 +330,7 @@ const UploadPage: FC = () => {
             <div>
               <div className="flex justify-between mb-2">
                 <span className="text-sm font-medium text-[var(--color-text-2)]">
-                  Processing your data...
+                  {stage || "Processing your data..."}
                 </span>
                 <span className="text-sm font-medium text-[var(--color-text-2)]">
                   {progress.toFixed(1)}%
@@ -382,7 +368,6 @@ const UploadPage: FC = () => {
               <button
                 onClick={() => {
                   setError(null);
-                  setProgress(0);
                   setEta(null);
                 }}
                 className={FEEDBACK.error.link}
