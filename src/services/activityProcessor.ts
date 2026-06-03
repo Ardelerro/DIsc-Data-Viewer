@@ -5,17 +5,10 @@ import type {
   ActivityWorkerResponse,
 } from "../types/discord";
 import { Profiler } from "./profiler";
+import { getDeviceTuning } from "../utils/deviceProfile";
 import ActivityWorker from "./activity.worker.ts?worker";
 
-const MAX_ACTIVITY_WORKERS = Math.max(
-  2,
-  Math.min(
-    (typeof navigator !== "undefined"
-      ? navigator.hardwareConcurrency || 4
-      : 4) - 1,
-    10,
-  ),
-);
+const WORKER_SILENCE_TIMEOUT_MS = 60_000;
 
 const ZERO: ActivityStats = {
   addReaction: 0,
@@ -35,6 +28,7 @@ async function processActivities(
   prof: Profiler = new Profiler(),
 ): Promise<ActivityStats> {
   const ap = new Profiler();
+  const tuning = getDeviceTuning();
 
   const reader = new ZipReader(new BlobReader(zipFile));
   const entries = await ap.timeAsync("coord:getEntries", () =>
@@ -84,7 +78,7 @@ async function processActivities(
   };
 
   const totals: ActivityStats = { ...ZERO };
-  const workerCount = Math.min(MAX_ACTIVITY_WORKERS, queue.length);
+  const workerCount = Math.min(tuning.maxWorkers, queue.length);
 
   const stopPool = ap.start("workerPool:wall");
   await Promise.all(
@@ -94,15 +88,36 @@ async function processActivities(
         new Promise<void>((resolve, reject) => {
           const worker = new ActivityWorker();
           let done = false;
+          let watchdog: ReturnType<typeof setTimeout>;
 
           const send = (req: ActivityWorkerRequest) => worker.postMessage(req);
 
-          const onAbort = () => {
+          const cleanup = () => {
+            clearTimeout(watchdog);
+            signal?.removeEventListener("abort", onAbort);
+          };
+          const fail = (err: Error) => {
             if (done) return;
             done = true;
+            cleanup();
             worker.terminate();
-            reject(new DOMException("Aborted", "AbortError"));
+            reject(err);
           };
+          const armWatchdog = () => {
+            clearTimeout(watchdog);
+            watchdog = setTimeout(() => {
+              fail(
+                new Error(
+                  `Activity worker stalled for ${
+                    WORKER_SILENCE_TIMEOUT_MS / 1000
+                  }s — the device likely ran out of memory.`,
+                ),
+              );
+            }, WORKER_SILENCE_TIMEOUT_MS);
+          };
+
+          const onAbort = () =>
+            fail(new DOMException("Aborted", "AbortError") as unknown as Error);
           if (signal) {
             if (signal.aborted) {
               onAbort();
@@ -114,6 +129,7 @@ async function processActivities(
           worker.onmessage = (ev: MessageEvent<ActivityWorkerResponse>) => {
             const m = ev.data;
             if (!m || done) return;
+            armWatchdog();
             if (m.type === "idle") {
               if (qi < queue.length) {
                 send({ type: "file", filename: queue[qi++] });
@@ -123,6 +139,9 @@ async function processActivities(
             } else if (m.type === "progress") {
               processedBytes += m.bytes;
               reportProgress();
+            } else if (m.type === "error") {
+              console.error("Activity worker reported failure:", m.message);
+              fail(new Error(m.message));
             } else if (m.type === "result") {
               for (const k in totals) {
                 totals[k as CounterKey] += m.counters[k as CounterKey];
@@ -130,19 +149,16 @@ async function processActivities(
 
               ap.merge(m.profile);
               done = true;
-              signal?.removeEventListener("abort", onAbort);
+              cleanup();
               worker.terminate();
               resolve();
             }
           };
           worker.onerror = (err) => {
-            if (done) return;
-            done = true;
-            signal?.removeEventListener("abort", onAbort);
             console.error("Activity worker error", err);
-            worker.terminate();
-            reject(err);
+            fail(new Error(err.message || "Activity worker crashed"));
           };
+          armWatchdog();
           send({ type: "init", file: zipFile });
         }),
     ),

@@ -207,33 +207,54 @@ self.onmessage = async (ev: MessageEvent<ActivityWorkerRequest>) => {
   const req = ev.data;
   if (!req) return;
 
-  if (req.type === "init") {
-    srcFile = req.file;
-    reader = new ZipReader(new BlobReader(req.file));
-    const entries = await prof.timeAsync("init:getEntries", () =>
-      reader!.getEntries(),
-    );
-    for (const e of entries) {
-      if (!e.directory)
-        entryByName.set((e as FileEntry).filename, e as FileEntry);
-    }
-    post({ type: "idle" });
-  } else if (req.type === "file") {
-    const entry = entryByName.get(req.filename);
-    if (entry && srcFile) {
-      try {
-        await scanEntry(srcFile, entry);
-      } catch (err) {
-        console.error("Activity scan error", req.filename, err);
+  try {
+    if (req.type === "init") {
+      srcFile = req.file;
+      reader = new ZipReader(new BlobReader(req.file));
+      const entries = await prof.timeAsync("init:getEntries", () =>
+        reader!.getEntries(),
+      );
+      for (const e of entries) {
+        if (!e.directory)
+          entryByName.set((e as FileEntry).filename, e as FileEntry);
       }
+      post({ type: "idle" });
+    } else if (req.type === "file") {
+      const entry = entryByName.get(req.filename);
+      if (entry && srcFile) {
+        try {
+          await scanEntry(srcFile, entry);
+        } catch (err) {
+          console.error("Activity scan error", req.filename, err);
+        }
+      }
+      post({ type: "idle" });
+    } else if (req.type === "stop") {
+      if (reader) {
+        try {
+          await reader.close();
+        } catch {
+          /* reader already closed / nothing to flush */
+        }
+      }
+      post({ type: "result", counters: { ...totals }, profile: prof.export() });
     }
-    post({ type: "idle" });
-  } else if (req.type === "stop") {
-    if (reader) {
-      try {
-        await reader.close();
-      } catch {}
-    }
-    post({ type: "result", counters: { ...totals }, profile: prof.export() });
+  } catch (err) {
+    post({
+      type: "error",
+      message: err instanceof Error ? err.message : String(err),
+    });
   }
 };
+
+// Backstops for failures that escape the handler above.
+self.addEventListener("error", (e) => {
+  post({ type: "error", message: e.message || "Activity worker error" });
+});
+self.addEventListener("unhandledrejection", (e) => {
+  const reason = (e as PromiseRejectionEvent).reason;
+  post({
+    type: "error",
+    message: reason instanceof Error ? reason.message : String(reason),
+  });
+});

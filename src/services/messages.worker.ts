@@ -26,7 +26,7 @@ configure({ useWebWorkers: false });
 
 const MESSAGE_GAP_THRESHOLD_S = 30 * 60;
 
-const STREAM_THRESHOLD_BYTES = 24 * 1024 * 1024;
+let streamThresholdBytes = 24 * 1024 * 1024;
 
 const PROGRESS_BATCH_BYTES = 2 * 1024 * 1024;
 
@@ -60,32 +60,56 @@ self.onmessage = async (ev: MessageEvent<MessageWorkerRequest>) => {
   const req = ev.data;
   if (!req) return;
 
-  if (req.type === "init") {
-    channelMapping = req.channelMapping;
-    aiMode = req.aiMode;
-    reader = new ZipReader(new BlobReader(req.file));
-    const entries = await prof.timeAsync("init:getEntries", () =>
-      reader!.getEntries(),
-    );
-    for (const e of entries) {
-      if (!e.directory) entryByName.set(e.filename, e as FileEntry);
-    }
-    post({ type: "idle" });
-  } else if (req.type === "file") {
-    await processFile(req.filename);
-    post({ type: "idle" });
-  } else if (req.type === "stop") {
-    if (reader) {
-      try {
-        await reader.close();
-      } catch {
-        /* reader already closed / nothing to flush */
+  try {
+    if (req.type === "init") {
+      channelMapping = req.channelMapping;
+      aiMode = req.aiMode;
+      if (
+        typeof req.streamThresholdBytes === "number" &&
+        req.streamThresholdBytes > 0
+      ) {
+        streamThresholdBytes = req.streamThresholdBytes;
       }
+      reader = new ZipReader(new BlobReader(req.file));
+      const entries = await prof.timeAsync("init:getEntries", () =>
+        reader!.getEntries(),
+      );
+      for (const e of entries) {
+        if (!e.directory) entryByName.set(e.filename, e as FileEntry);
+      }
+      post({ type: "idle" });
+    } else if (req.type === "file") {
+      await processFile(req.filename);
+      post({ type: "idle" });
+    } else if (req.type === "stop") {
+      if (reader) {
+        try {
+          await reader.close();
+        } catch {
+        }
+      }
+      post({ type: "result", agg, channels, profile: prof.export() });
+      self.close();
     }
-    post({ type: "result", agg, channels, profile: prof.export() });
+  } catch (err) {
+    post({
+      type: "error",
+      message: err instanceof Error ? err.message : String(err),
+    });
     self.close();
   }
 };
+
+self.addEventListener("error", (e) => {
+  post({ type: "error", message: e.message || "Message worker error" });
+});
+self.addEventListener("unhandledrejection", (e) => {
+  const reason = (e as PromiseRejectionEvent).reason;
+  post({
+    type: "error",
+    message: reason instanceof Error ? reason.message : String(reason),
+  });
+});
 
 interface ChannelAcc {
   hourly: Record<string, number>;
@@ -160,7 +184,7 @@ async function processFile(filename: string) {
     if (!channelMapping[channelId]) return;
 
     const acc = createAcc();
-    if (size >= STREAM_THRESHOLD_BYTES) {
+    if (size >= streamThresholdBytes) {
       await streamFile(entry, acc, reportDelta);
     } else {
       await parseWhole(entry, acc);

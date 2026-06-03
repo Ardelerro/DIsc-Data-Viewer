@@ -156,6 +156,7 @@ type MessageWorkerRequest =
       channelMapping: Record<string, string>;
 
       aiMode: boolean;
+      streamThresholdBytes?: number;
     }
   | { type: "file"; filename: string }
   | { type: "stop" };
@@ -169,7 +170,8 @@ type MessageWorkerResponse =
       channels: Array<{ channelId: string; stats: ChannelStats }>;
 
       profile: ProfileBuckets;
-    };
+    }
+  | { type: "error"; message: string };
 
 type ActivityWorkerRequest =
   | { type: "init"; file: File | Blob }
@@ -179,7 +181,8 @@ type ActivityWorkerRequest =
 type ActivityWorkerResponse =
   | { type: "idle" }
   | { type: "progress"; bytes: number }
-  | { type: "result"; counters: ActivityStats; profile: ProfileBuckets };
+  | { type: "result"; counters: ActivityStats; profile: ProfileBuckets }
+  | { type: "error"; message: string };
 
 interface UserStats {
   channelId: string;

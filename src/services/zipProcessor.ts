@@ -16,19 +16,29 @@ import type {
 import { getTopWords } from "../utils/textUtils";
 import { Profiler } from "./profiler";
 import { enrichUserMapping } from "./discordUser";
+import { getDeviceTuning } from "../utils/deviceProfile";
 import MessageWorker from "./messages.worker.ts?worker";
 
 configure({ useWebWorkers: true });
+const WORKER_SILENCE_TIMEOUT_MS = 60_000;
 
-const MAX_WORKERS = Math.max(
-  2,
-  Math.min(
-    (typeof navigator !== "undefined"
-      ? navigator.hardwareConcurrency || 4
-      : 4) - 1,
-    10,
-  ),
-);
+async function runWithConcurrency<T>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<void>,
+): Promise<void> {
+  if (!Number.isFinite(limit) || limit >= items.length) {
+    await Promise.all(items.map(fn));
+    return;
+  }
+  let next = 0;
+  const run = async () => {
+    while (next < items.length) await fn(items[next++]);
+  };
+  await Promise.all(
+    Array.from({ length: Math.max(1, limit) }, () => run()),
+  );
+}
 
 async function processZipData(
   file: File | Blob,
@@ -39,6 +49,7 @@ async function processZipData(
   onEnriched?: () => void,
 ): Promise<Omit<ProcessedData, "activityStats">> {
   const zp = new Profiler();
+  const tuning = getDeviceTuning();
   const reader = new ZipReader(new BlobReader(file));
   const entries = await zp.timeAsync("getEntries", () => reader.getEntries());
 
@@ -80,8 +91,10 @@ async function processZipData(
   const serverNames: Record<string, string> = {};
 
   const stopChannelPass = zp.start("channelJsonPass");
-  await Promise.all(
-    channelEntries.map(async (entry) => {
+  await runWithConcurrency(
+    channelEntries,
+    tuning.channelPassConcurrency,
+    async (entry) => {
       try {
         const text = await entry.getData(new TextWriter());
         const data = JSON.parse(text);
@@ -118,7 +131,7 @@ async function processZipData(
       } catch (err) {
         console.warn("Failed to parse channel.json", err);
       }
-    }),
+    },
   );
   stopChannelPass();
 
@@ -197,7 +210,7 @@ async function processZipData(
       onProgress?.(3 + pct * 0.95);
     };
 
-    const workerCount = Math.min(MAX_WORKERS, totalFiles);
+    const workerCount = Math.min(tuning.maxWorkers, totalFiles);
 
     const stopPool = zp.start("workerPool:wall");
     await Promise.all(
@@ -207,13 +220,35 @@ async function processZipData(
           new Promise<void>((resolve, reject) => {
             const worker = new MessageWorker();
             let done = false;
+            let watchdog: ReturnType<typeof setTimeout>;
 
-            const onAbort = () => {
+            const cleanup = () => {
+              clearTimeout(watchdog);
+              signal?.removeEventListener("abort", onAbort);
+            };
+            const fail = (err: Error) => {
               if (done) return;
               done = true;
+              cleanup();
               worker.terminate();
-              reject(new DOMException("Aborted", "AbortError"));
+              reject(err);
             };
+            const armWatchdog = () => {
+              clearTimeout(watchdog);
+              watchdog = setTimeout(() => {
+                fail(
+                  new Error(
+                    `Message worker stalled for ${
+                      WORKER_SILENCE_TIMEOUT_MS / 1000
+                    }s — the device likely ran out of memory while processing ` +
+                      `this export. Try a desktop browser or the precomputed-JSON path.`,
+                  ),
+                );
+              }, WORKER_SILENCE_TIMEOUT_MS);
+            };
+
+            const onAbort = () =>
+              fail(new DOMException("Aborted", "AbortError") as unknown as Error);
             if (signal) {
               if (signal.aborted) {
                 onAbort();
@@ -225,6 +260,7 @@ async function processZipData(
             worker.onmessage = (ev: MessageEvent<MessageWorkerResponse>) => {
               const m = ev.data;
               if (!m || done) return;
+              armWatchdog();
               if (m.type === "idle") {
                 if (qi < queue.length) {
                   worker.postMessage({ type: "file", filename: queue[qi++] });
@@ -234,6 +270,9 @@ async function processZipData(
               } else if (m.type === "progress") {
                 processedBytes += m.bytes;
                 reportProgress();
+              } else if (m.type === "error") {
+                console.error("Message worker reported failure:", m.message);
+                fail(new Error(m.message));
               } else if (m.type === "result") {
                 mergeAggregate(
                   aggregateStats,
@@ -251,20 +290,23 @@ async function processZipData(
 
                 zp.merge(m.profile, "msgworker/");
                 done = true;
-                signal?.removeEventListener("abort", onAbort);
+                cleanup();
                 worker.terminate();
                 resolve();
               }
             };
             worker.onerror = (err) => {
-              if (done) return;
-              done = true;
-              signal?.removeEventListener("abort", onAbort);
               console.error("Message worker error", err);
-              worker.terminate();
-              reject(err);
+              fail(new Error(err.message || "Message worker crashed"));
             };
-            worker.postMessage({ type: "init", file, channelMapping, aiMode });
+            armWatchdog();
+            worker.postMessage({
+              type: "init",
+              file,
+              channelMapping,
+              aiMode,
+              streamThresholdBytes: tuning.streamThresholdBytes,
+            });
           }),
       ),
     );
