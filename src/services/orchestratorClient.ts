@@ -1,5 +1,6 @@
 import OrchestratorSharedWorker from "./orchestrator.sharedworker.ts?sharedworker";
 import { JobRunner } from "./jobRunner";
+import { isMobileDevice } from "../utils/serviceUtils/deviceProfile";
 import type { OrchestratorEvent, OrchestratorRequest, JobStatus, UploadOptions } from "../types/worker";
 
 
@@ -16,7 +17,7 @@ let fallback: JobRunner | null = null;
 
 function ensureBackend(): void {
   if (port || fallback) return;
-  if (typeof SharedWorker !== "undefined") {
+  if (typeof SharedWorker !== "undefined" && !isMobileDevice()) {
     try {
       const sw = new OrchestratorSharedWorker();
       port = sw.port;
