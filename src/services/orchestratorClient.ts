@@ -1,6 +1,5 @@
-import OrchestratorSharedWorker from "./orchestrator.sharedworker.ts?sharedworker";
+import EngineWorker from "./engine.worker.ts?worker";
 import { JobRunner } from "./jobRunner";
-import { isMobileDevice } from "../utils/serviceUtils/deviceProfile";
 import type { OrchestratorEvent, OrchestratorRequest, JobStatus, UploadOptions } from "../types/worker";
 
 
@@ -12,25 +11,24 @@ function dispatch(event: OrchestratorEvent): void {
   for (const l of listeners) l(event);
 }
 
-let port: MessagePort | null = null;
+let worker: Worker | null = null;
 let fallback: JobRunner | null = null;
 
 function ensureBackend(): void {
-  if (port || fallback) return;
-  if (typeof SharedWorker !== "undefined" && !isMobileDevice()) {
+  if (worker || fallback) return;
+  if (typeof Worker !== "undefined") {
     try {
-      const sw = new OrchestratorSharedWorker();
-      port = sw.port;
-      port.onmessage = (ev: MessageEvent<OrchestratorEvent>) => {
+      worker = new EngineWorker();
+      worker.onmessage = (ev: MessageEvent<OrchestratorEvent>) => {
         if (ev.data) dispatch(ev.data);
       };
-      port.start();
       return;
     } catch (err) {
       console.warn(
-        "SharedWorker unavailable; processing will run in-page (won't survive refresh):",
+        "Engine worker unavailable; processing will run in-page:",
         err,
       );
+      worker = null;
     }
   }
   fallback = new JobRunner((event) => dispatch(event));
@@ -38,8 +36,8 @@ function ensureBackend(): void {
 
 function send(req: OrchestratorRequest): void {
   ensureBackend();
-  if (port) {
-    port.postMessage(req);
+  if (worker) {
+    worker.postMessage(req);
     return;
   }
   if (!fallback) return;

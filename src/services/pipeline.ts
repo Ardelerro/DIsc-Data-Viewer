@@ -99,8 +99,11 @@ export async function runPipeline(
 
     let current: ProcessedData | null = null;
     let persistTimer: ReturnType<typeof setTimeout> | undefined;
+    signal.addEventListener("abort", () => clearTimeout(persistTimer), {
+      once: true,
+    });
     const onEnriched = () => {
-      if (!current) return;
+      if (signal.aborted || !current) return;
       current = { ...current };
       emit({ type: "snapshot", data: current });
       const snapshot = current;
